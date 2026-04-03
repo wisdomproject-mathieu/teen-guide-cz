@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useCloudData } from "@/hooks/useCloudData";
 import Onboarding from "@/components/Onboarding";
 import InAppNotifications from "@/components/InAppNotifications";
