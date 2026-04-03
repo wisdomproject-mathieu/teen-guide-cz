@@ -567,7 +567,7 @@ export default function Index() {
               {lastMoodMonkey ? (
                 <img src={lastMoodMonkey} alt="" className="anim-monkeyBob" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
               ) : (
-                <img src={monkeyHero} alt="" className="anim-float" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
+                <img src={currentSkinImg} alt="" className="anim-float" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
               )}
             </div>
 
