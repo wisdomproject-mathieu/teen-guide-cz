@@ -366,9 +366,9 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,padding:24}}>
       <img src={monkeySos} alt="SOS" style={{width:100,height:100,objectFit:"contain",filter:"drop-shadow(0 0 30px rgba(255,59,92,0.5))"}} />
       <div style={{color:T.t1,fontSize:22,fontWeight:800}}>Co ti teď pomůže?</div>
-      {[{icon:"🎙",label:"Motivační řeč",sub:"Goggins, Jocko, Les Brown…",color:T.accent},{icon:"🤘",label:"Těžká hudba",sub:"Nech vztek ven",color:T.red},{icon:"🌬",label:"Dýchání",sub:"Box breathing",color:T.teal}].map((o,i)=>
+      {[{img:monkeyAngry,label:"Motivační řeč",sub:"Goggins, Jocko, Les Brown…",color:T.accent},{img:monkeyMusic,label:"Těžká hudba",sub:"Nech vztek ven",color:T.red},{img:monkeyZen,label:"Dýchání",sub:"Box breathing",color:T.teal}].map((o,i)=>
         <button key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"16px 20px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16,width:"100%",maxWidth:340,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
-          <div style={{width:50,height:50,borderRadius:14,background:`${o.color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>{o.icon}</div>
+          <img src={o.img} alt={o.label} style={{width:50,height:50,objectFit:"contain",borderRadius:14}} loading="lazy" />
           <div><div style={{color:T.t1,fontSize:16,fontWeight:700}}>{o.label}</div><div style={{color:T.t2,fontSize:12}}>{o.sub}</div></div>
         </button>
       )}
