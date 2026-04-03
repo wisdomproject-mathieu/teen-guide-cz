@@ -25,6 +25,12 @@ import monkeyPumped from "@/assets/monkey-pumped.png";
 import monkeySadMood from "@/assets/monkey-sad-mood.png";
 import monkeyChat from "@/assets/monkey-chat.png";
 import monkeyProfile from "@/assets/monkey-profile.png";
+import monkeyQuests from "@/assets/monkey-quests.png";
+import monkeySkinKing from "@/assets/monkey-skin-king.png";
+import monkeySkinAstro from "@/assets/monkey-skin-astro.png";
+import monkeySkinNinja from "@/assets/monkey-skin-ninja.png";
+import monkeySkinFire from "@/assets/monkey-skin-fire.png";
+import monkeySkinDiamond from "@/assets/monkey-skin-diamond.png";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -188,163 +194,121 @@ function BreathingExercise({type="box"}: {type?: string}) {
   );
 }
 
-// ── MONKEY CHAT (AI) ──
-type ChatMsg = { role: "user" | "assistant"; content: string };
+// ── DAILY QUESTS & SKINS ──
+const MONKEY_SKINS = [
+  { id: "default", name: "OG Opice", img: monkeyHero, xpNeeded: 0, color: T.accent, desc: "Tvůj základní skin" },
+  { id: "fire", name: "Fire Opice 🔥", img: monkeySkinFire, xpNeeded: 50, color: "#FF3B5C", desc: "Odemkni za 50 XP" },
+  { id: "ninja", name: "Ninja Opice 🥷", img: monkeySkinNinja, xpNeeded: 150, color: "#00D4AA", desc: "Odemkni za 150 XP" },
+  { id: "astro", name: "Astro Opice 🚀", img: monkeySkinAstro, xpNeeded: 300, color: "#4A8FFF", desc: "Odemkni za 300 XP" },
+  { id: "diamond", name: "Diamond Opice 💎", img: monkeySkinDiamond, xpNeeded: 500, color: "#A855F7", desc: "Odemkni za 500 XP" },
+  { id: "king", name: "King Opice 👑", img: monkeySkinKing, xpNeeded: 1000, color: "#FFD700", desc: "Odemkni za 1000 XP" },
+];
 
-function MonkeyChat() {
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+const DAILY_QUESTS = [
+  { id: "checkin", label: "Denní check-in", desc: "Řekni jak se cítíš", xp: 10, icon: "🎯" },
+  { id: "breathe", label: "Dýchací cvičení", desc: "Dokonči 1 dýchací session", xp: 15, icon: "🌬️" },
+  { id: "diary", label: "Zápis do deníku", desc: "Napiš aspoň 1 větu", xp: 10, icon: "📝" },
+  { id: "speech", label: "Poslech řeči", desc: "Přehraj si 1 motivační řeč", xp: 15, icon: "🔊" },
+  { id: "grounding", label: "5-4-3-2-1 Reset", desc: "Dokonči grounding cvičení", xp: 20, icon: "🧘" },
+  { id: "streak3", label: "3denní streak", desc: "Přijď 3 dny v řadě", xp: 30, icon: "🔥" },
+  { id: "streak7", label: "7denní streak", desc: "Přijď 7 dní v řadě", xp: 75, icon: "⚡" },
+];
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+function QuestsTab({ xp, completedQuests, onEquipSkin, equippedSkin }: { xp: number; completedQuests: string[]; onEquipSkin: (id: string) => void; equippedSkin: string }) {
+  const [view, setView] = useState<"quests" | "skins">("quests");
+  const todayKey = new Date().toISOString().split("T")[0];
+  const todayCompleted = completedQuests.filter(q => q.startsWith(todayKey)).map(q => q.split(":")[1]);
 
-  const send = async () => {
-    const text = input.trim();
-    if (!text || isLoading) return;
-    const userMsg: ChatMsg = { role: "user", content: text };
-    const allMsgs = [...messages, userMsg];
-    setMessages(allMsgs);
-    setInput("");
-    setIsLoading(true);
-
-    let assistantSoFar = "";
-    try {
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/monkey-chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-        body: JSON.stringify({ messages: allMsgs }),
-      });
-
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: "Něco se pokazilo" }));
-        setMessages(prev => [...prev, { role: "assistant", content: err.error || "Opičák teď nemůže, zkus to znovu 🐵" }]);
-        setIsLoading(false);
-        return;
-      }
-
-      const reader = resp.body?.getReader();
-      if (!reader) throw new Error("No reader");
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") break;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) {
-              assistantSoFar += content;
-              const snap = assistantSoFar;
-              setMessages(prev => {
-                const last = prev[prev.length - 1];
-                if (last?.role === "assistant") return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: snap } : m);
-                return [...prev, { role: "assistant", content: snap }];
-              });
-            }
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
-          }
-        }
-      }
-    } catch (e) {
-      console.error(e);
-      if (!assistantSoFar) {
-        setMessages(prev => [...prev, { role: "assistant", content: "Opičák se zasekl... zkus to znovu 🐵" }]);
-      }
-    }
-    setIsLoading(false);
-  };
-
-  const quickStarters = [
-    "Mám blbej den 😒",
-    "Naštval mě kámoš",
-    "Mám strach ze zkoušky",
-    "Cítím se sám/a",
-  ];
+  const currentLevel = Math.floor(xp / 100) + 1;
+  const xpInLevel = xp % 100;
+  const nextSkin = MONKEY_SKINS.find(s => s.xpNeeded > xp);
 
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"100%",paddingTop:8}}>
-      {/* Chat header */}
-      <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0 12px",borderBottom:`1px solid ${T.border}`,marginBottom:8}}>
-        <img src={monkeyChat} alt="" style={{width:48,height:48,objectFit:"contain",borderRadius:14}} />
-        <div>
-          <div style={{color:T.t1,fontSize:18,fontWeight:900}}>Opičák</div>
-          <div style={{color:T.teal,fontSize:11,fontWeight:600}}>● Online — vždycky tu pro tebe</div>
+    <div style={{ paddingTop: 8 }} className="anim-fadeUp">
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, padding: 16, background: `linear-gradient(135deg, ${T.accent}15, ${T.purple}08)`, borderRadius: 20, border: `1px solid ${T.accent}20` }}>
+        <img src={monkeyQuests} alt="" className="anim-monkeyBob" style={{ width: 64, height: 64, objectFit: "contain" }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ color: T.t1, fontSize: 20, fontWeight: 900 }}>Level {currentLevel} 🐵</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+            <div style={{ flex: 1, height: 8, background: T.card, borderRadius: 99, border: `1px solid ${T.border}`, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${xpInLevel}%`, background: `linear-gradient(90deg, ${T.accent}, ${T.teal})`, borderRadius: 99, transition: "width .5s ease" }} />
+            </div>
+            <span style={{ color: T.accent, fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{xp} XP</span>
+          </div>
+          {nextSkin && <div style={{ color: T.t3, fontSize: 11, marginTop: 4 }}>Další skin: {nextSkin.name} za {nextSkin.xpNeeded} XP</div>}
         </div>
       </div>
 
-      {/* Messages */}
-      <div ref={scrollRef} style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
-        {messages.length === 0 && (
-          <div className="anim-fadeUp" style={{textAlign:"center",padding:"32px 16px"}}>
-            <img src={monkeyChat} alt="" className="anim-float" style={{width:80,height:80,objectFit:"contain",margin:"0 auto 16px"}} />
-            <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:6}}>Yo! Jsem Opičák 🐵</div>
-            <div style={{color:T.t2,fontSize:13,marginBottom:20,lineHeight:1.5}}>Tvůj AI brácha. Řekni mi co tě trápí, nebo prostě pokecej.</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
-              {quickStarters.map((q, i) => (
-                <button key={i} onClick={() => { setInput(q); setTimeout(() => inputRef.current?.focus(), 50); }}
-                  className="reason-card" style={{padding:"8px 14px",background:T.card,border:`1px solid ${T.border}`,borderRadius:99,color:T.t2,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {messages.map((m, i) => (
-          <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start",gap:8,padding:"2px 0"}} className="anim-fadeUp">
-            {m.role === "assistant" && <img src={monkeyChat} alt="" style={{width:28,height:28,objectFit:"contain",borderRadius:8,flexShrink:0,marginTop:4}} />}
-            <div style={{
-              maxWidth:"78%",padding:"10px 14px",borderRadius:m.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px",
-              background:m.role==="user"?`linear-gradient(135deg, ${T.accent}, ${T.accent}CC)`:T.card,
-              border:m.role==="user"?"none":`1px solid ${T.border}`,
-              color:m.role==="user"?"#fff":T.t1,fontSize:14,lineHeight:1.5,fontWeight:500,
-              whiteSpace:"pre-wrap",wordBreak:"break-word",
-            }}>
-              {m.content}
-            </div>
-          </div>
+      {/* Toggle */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        {[{ id: "quests" as const, label: "⚔️ Výzvy" }, { id: "skins" as const, label: "🐵 Skiny" }].map(t => (
+          <button key={t.id} onClick={() => setView(t.id)} className="reason-card" style={{ flex: 1, padding: "10px 0", background: view === t.id ? T.accentDim : T.card, border: `1px solid ${view === t.id ? T.accent : T.border}`, borderRadius: 14, color: view === t.id ? T.accent : T.t2, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{t.label}</button>
         ))}
+      </div>
 
-        {isLoading && messages[messages.length-1]?.role !== "assistant" && (
-          <div style={{display:"flex",gap:8,padding:"2px 0"}} className="anim-fadeUp">
-            <img src={monkeyChat} alt="" style={{width:28,height:28,objectFit:"contain",borderRadius:8}} />
-            <div style={{padding:"10px 14px",background:T.card,border:`1px solid ${T.border}`,borderRadius:"16px 16px 16px 4px",color:T.t2,fontSize:14}}>
-              <span className="anim-float">🐵</span> přemýšlím...
-            </div>
+      {view === "quests" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ color: T.t1, fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Denní mise</div>
+          {DAILY_QUESTS.slice(0, 5).map((q, i) => {
+            const done = todayCompleted.includes(q.id);
+            return (
+              <div key={q.id} className={`reason-card anim-fadeUp anim-d${i + 1}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, background: done ? `${T.teal}08` : T.card, border: `1px solid ${done ? `${T.teal}30` : T.border}`, borderRadius: 14 }}>
+                <span style={{ fontSize: 24, filter: done ? "none" : "grayscale(0.5)" }}>{q.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: done ? T.teal : T.t1, fontSize: 14, fontWeight: 700, textDecoration: done ? "line-through" : "none" }}>{q.label}</div>
+                  <div style={{ color: T.t3, fontSize: 11 }}>{q.desc}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ color: done ? T.teal : T.accent, fontSize: 14, fontWeight: 800 }}>+{q.xp}</span>
+                  <span style={{ fontSize: 11 }}>XP</span>
+                  {done && <span style={{ color: T.teal, fontSize: 16, marginLeft: 4 }}>✓</span>}
+                </div>
+              </div>
+            );
+          })}
+
+          <div style={{ color: T.t1, fontSize: 16, fontWeight: 800, marginTop: 12, marginBottom: 4 }}>Streak výzvy</div>
+          {DAILY_QUESTS.slice(5).map((q, i) => {
+            const done = todayCompleted.includes(q.id);
+            return (
+              <div key={q.id} className={`reason-card anim-fadeUp anim-d${i + 1}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, background: done ? `${T.accent}08` : T.card, border: `1px solid ${done ? `${T.accent}30` : T.border}`, borderRadius: 14 }}>
+                <span style={{ fontSize: 24 }}>{q.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: done ? T.accent : T.t1, fontSize: 14, fontWeight: 700 }}>{q.label}</div>
+                  <div style={{ color: T.t3, fontSize: 11 }}>{q.desc}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ color: T.accent, fontSize: 14, fontWeight: 800 }}>+{q.xp}</span>
+                  <span style={{ fontSize: 11 }}>XP</span>
+                  {done && <span style={{ color: T.teal, fontSize: 16, marginLeft: 4 }}>✓</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {view === "skins" && (
+        <div>
+          <div style={{ color: T.t2, fontSize: 13, marginBottom: 12 }}>Sbírej XP plněním misí a odemykej nový skiny!</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {MONKEY_SKINS.map((s, i) => {
+              const unlocked = xp >= s.xpNeeded;
+              const equipped = equippedSkin === s.id;
+              return (
+                <button key={s.id} onClick={() => unlocked && onEquipSkin(s.id)} className={`reason-card anim-fadeUp anim-d${i + 1}`} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16, background: equipped ? `${s.color}15` : T.card, border: `1px solid ${equipped ? s.color : unlocked ? `${s.color}30` : T.border}`, borderRadius: 16, cursor: unlocked ? "pointer" : "default", fontFamily: "inherit", opacity: unlocked ? 1 : 0.5, position: "relative" }}>
+                  {equipped && <div style={{ position: "absolute", top: 8, right: 8, background: s.color, color: "#000", fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 99 }}>EQUIPPED</div>}
+                  <img src={s.img} alt={s.name} style={{ width: 72, height: 72, objectFit: "contain", filter: unlocked ? "none" : "grayscale(1) brightness(0.5)" }} loading="lazy" />
+                  <div style={{ color: unlocked ? T.t1 : T.t3, fontSize: 13, fontWeight: 800, textAlign: "center" }}>{s.name}</div>
+                  {!unlocked && <div style={{ color: T.t3, fontSize: 11 }}>🔒 {s.xpNeeded} XP</div>}
+                  {unlocked && !equipped && <div style={{ color: s.color, fontSize: 11, fontWeight: 700 }}>Klikni = nasaď</div>}
+                </button>
+              );
+            })}
           </div>
-        )}
-      </div>
-
-      {/* Input */}
-      <div style={{display:"flex",gap:8,padding:"8px 0 4px",borderTop:`1px solid ${T.border}`}}>
-        <input ref={inputRef} value={input} onChange={e=>setInput(e.target.value)}
-          onKeyDown={e=>{ if(e.key==="Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-          placeholder="Napiš opičákovi..."
-          style={{flex:1,padding:"12px 16px",background:T.card,border:`1px solid ${T.border}`,borderRadius:99,color:T.t1,fontSize:14,fontFamily:"inherit",outline:"none"}}
-        />
-        <button onClick={send} disabled={isLoading || !input.trim()}
-          style={{width:44,height:44,borderRadius:"50%",background:input.trim()?T.accent:`${T.accent}30`,border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:input.trim()?"pointer":"default",fontSize:18,flexShrink:0,transition:"all .2s"}}>
-          ↑
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -493,6 +457,9 @@ export default function Index() {
   const [showSOS, setShowSOS] = useState(false);
   const [moodLog, setMoodLog] = useState<any[]>([]);
   const [streakCount, setStreakCount] = useState(0);
+  const [xp, setXp] = useState(() => Number(localStorage.getItem("mm_xp") || "0"));
+  const [completedQuests, setCompletedQuests] = useState<string[]>(() => JSON.parse(localStorage.getItem("mm_quests") || "[]"));
+  const [equippedSkin, setEquippedSkin] = useState(() => localStorage.getItem("mm_skin") || "default");
   const [userName, setUserName] = useState(() => localStorage.getItem("mm_name") || "");
   const [avatar, setAvatar] = useState<string|null>(() => localStorage.getItem("mm_avatar"));
   const fileRef = useRef<HTMLInputElement>(null);
@@ -508,6 +475,21 @@ export default function Index() {
     if (f) { const r = new FileReader(); r.onload = (ev: any) => { setAvatar(ev.target.result); localStorage.setItem("mm_avatar", ev.target.result); }; r.readAsDataURL(f); }
   };
 
+  const completeQuest = (questId: string) => {
+    const key = `${new Date().toISOString().split("T")[0]}:${questId}`;
+    if (completedQuests.includes(key)) return;
+    const quest = DAILY_QUESTS.find(q => q.id === questId);
+    if (!quest) return;
+    const newQ = [...completedQuests, key];
+    setCompletedQuests(newQ);
+    localStorage.setItem("mm_quests", JSON.stringify(newQ));
+    const newXp = xp + quest.xp;
+    setXp(newXp);
+    localStorage.setItem("mm_xp", String(newXp));
+  };
+  const equipSkin = (id: string) => { setEquippedSkin(id); localStorage.setItem("mm_skin", id); };
+  const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
+
   const selectMood = (m: any) => { setSelectedMood(m); setStep(2); };
   const selectReason = (r: any) => {
     setSelectedReason(r);
@@ -515,6 +497,9 @@ export default function Index() {
     setStreakCount(p => p + 1);
     setRecs(getRecommendations(selectedMood, r));
     setStep(3);
+    completeQuest("checkin");
+    if (streakCount + 1 >= 3) completeQuest("streak3");
+    if (streakCount + 1 >= 7) completeQuest("streak7");
   };
   const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); };
 
@@ -582,7 +567,7 @@ export default function Index() {
               {lastMoodMonkey ? (
                 <img src={lastMoodMonkey} alt="" className="anim-monkeyBob" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
               ) : (
-                <img src={monkeyHero} alt="" className="anim-float" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
+                <img src={currentSkinImg} alt="" className="anim-float" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
               )}
             </div>
 
@@ -716,11 +701,11 @@ export default function Index() {
                 )}
 
                 {/* Talk to Opičák CTA */}
-                <button onClick={()=>setTab("chat")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.teal}12, ${T.blue}08)`,border:`1px solid ${T.teal}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:20}}>
-                  <img src={monkeyChat} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
+                <button onClick={()=>setTab("quests")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.teal}12, ${T.blue}08)`,border:`1px solid ${T.teal}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:20}}>
+                  <img src={monkeyQuests} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
                   <div>
-                    <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Chceš si promluvit? 🐵</div>
-                    <div style={{color:T.t2,fontSize:12}}>Opičák ti pomůže — pokecej s ním</div>
+                    <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Splň výzvy, odemkni skiny! 🐵</div>
+                    <div style={{color:T.t2,fontSize:12}}>Sbírej XP a vylepši svou opici</div>
                   </div>
                 </button>
 
@@ -737,8 +722,8 @@ export default function Index() {
           </div>
         )}
 
-        {/* ════════ CHAT TAB ════════ */}
-        {tab === "chat" && <MonkeyChat />}
+        {/* ════════ QUESTS TAB ════════ */}
+        {tab === "quests" && <QuestsTab xp={xp} completedQuests={completedQuests} onEquipSkin={equipSkin} equippedSkin={equippedSkin} />}
 
         {/* ════════ PROFILE TAB ════════ */}
         {tab === "profile" && (
@@ -752,8 +737,8 @@ export default function Index() {
           <img src={monkeyHero} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="feel"?1:0.5,transition:"opacity .2s"}} />CÍTÍM
         </button>
 
-        <button onClick={()=>setTab("chat")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="chat"?T.teal:T.t3,fontSize:10,fontWeight:700}}>
-          <img src={monkeyChat} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="chat"?1:0.5,transition:"opacity .2s"}} />OPIČÁK
+        <button onClick={()=>setTab("quests")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="quests"?T.teal:T.t3,fontSize:10,fontWeight:700}}>
+          <img src={monkeyQuests} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="quests"?1:0.5,transition:"opacity .2s"}} />VÝZVY
         </button>
 
         <button onClick={()=>setShowSOS(true)} className="nav-btn" style={{width:58,height:58,borderRadius:"50%",background:`radial-gradient(circle,${T.red},#CC2040)`,border:"3px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:`0 4px 24px ${T.red}50`,transform:"translateY(-10px)",animation:"pulse 3s infinite",flexShrink:0}}>
