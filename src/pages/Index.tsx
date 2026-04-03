@@ -495,10 +495,12 @@ export default function Index() {
                 <div style={{color:T.t2,fontSize:12,marginBottom:16}}>Vyber co je nejblíž — opice najde co ti pomůže</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                   {REASONS.map(r => (
-                    <button key={r.id} onClick={()=>selectReason(r)} style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:4,padding:14,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
-                      <span>{r.icon}</span>
-                      <div style={{color:T.t1,fontSize:14,fontWeight:700}}>{r.label}</div>
-                      <div style={{color:T.t2,fontSize:11}}>{r.sub}</div>
+                    <button key={r.id} onClick={()=>selectReason(r)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
+                      <img src={REASON_MONKEY[r.id]} alt={r.label} style={{width:40,height:40,objectFit:"contain",borderRadius:8}} loading="lazy" />
+                      <div style={{flex:1}}>
+                        <div style={{color:T.t1,fontSize:13,fontWeight:700}}>{r.label}</div>
+                        <div style={{color:T.t2,fontSize:10}}>{r.sub}</div>
+                      </div>
                     </button>
                   ))}
                 </div>
