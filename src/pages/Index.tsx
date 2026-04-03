@@ -694,7 +694,41 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
   );
 }
 
-// ── SOS OVERLAY ──
+// ── XP POPUP ──
+function XpPopup({ xp, label, onDone }: { xp: number; label: string; onDone: () => void }) {
+  useEffect(() => { const t = setTimeout(onDone, 2200); return () => clearTimeout(t); }, [onDone]);
+  return (
+    <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:10000,pointerEvents:"none",textAlign:"center",animation:"xpPopIn .4s cubic-bezier(.36,1.1,.3,1) both"}}>
+      <div style={{fontSize:48,fontWeight:900,color:T.accent,textShadow:`0 0 30px ${T.accent}80, 0 0 60px ${T.accent}40`,animation:"xpFloat 2s ease-out both"}}>+{xp} XP</div>
+      <div style={{fontSize:16,fontWeight:700,color:T.t1,marginTop:4,opacity:0.9}}>{label}</div>
+    </div>
+  );
+}
+
+// ── LEVEL UP CELEBRATION ──
+function LevelUpOverlay({ level, skin, onDone }: { level: number; skin?: typeof MONKEY_SKINS[0] | null; onDone: () => void }) {
+  useEffect(() => { const t = setTimeout(onDone, 3500); return () => clearTimeout(t); }, [onDone]);
+  return (
+    <div onClick={onDone} style={{position:"fixed",inset:0,zIndex:10001,background:"rgba(0,0,0,0.85)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,cursor:"pointer",animation:"fadeIn .3s ease-out both"}}>
+      {/* Particles */}
+      {Array.from({length:20}).map((_,i) => (
+        <div key={i} style={{position:"absolute",width:8,height:8,borderRadius:"50%",background:[T.accent,T.teal,T.purple,"#FFD700",T.red][i%5],top:"50%",left:"50%",animation:`particle${i%4} ${1.5+Math.random()}s ease-out both`,animationDelay:`${Math.random()*0.3}s`,opacity:0}} />
+      ))}
+      <div style={{fontSize:64,animation:"bounceIn .5s cubic-bezier(.36,1.1,.3,1) both"}}>🎉</div>
+      <div style={{fontSize:32,fontWeight:900,color:T.accent,textShadow:`0 0 20px ${T.accent}60`,animation:"bounceIn .5s cubic-bezier(.36,1.1,.3,1) both",animationDelay:".1s"}}>LEVEL {level}!</div>
+      {skin && (
+        <div style={{animation:"bounceIn .6s cubic-bezier(.36,1.1,.3,1) both",animationDelay:".3s",textAlign:"center"}}>
+          <div style={{fontSize:14,color:T.teal,fontWeight:700,marginBottom:8}}>🔓 Nový skin odemčen!</div>
+          <img src={skin.img} alt={skin.name} style={{width:100,height:100,objectFit:"contain",filter:`drop-shadow(0 0 20px ${skin.color}60)`,animation:"float 2s ease-in-out infinite"}} />
+          <div style={{color:T.t1,fontSize:16,fontWeight:800,marginTop:8}}>{skin.name}</div>
+        </div>
+      )}
+      <div style={{color:T.t3,fontSize:12,marginTop:12,animation:"fadeIn .5s ease-out both",animationDelay:".5s"}}>Klikni kamkoliv</div>
+    </div>
+  );
+}
+
+
 function SOSOverlay({onClose}: {onClose:()=>void}) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,padding:24}}>
