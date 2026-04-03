@@ -580,18 +580,19 @@ export default function Index() {
 
         {/* ════════ LEARN TAB ════════ */}
         {tab === "learn" && (
-          <div style={{paddingTop:20}}>
-            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
-              <img src={monkeyLearn} alt="" style={{width:64,height:64,objectFit:"contain"}} loading="lazy" />
+          <div style={{paddingTop:16}} className="anim-fadeUp">
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20,padding:16,background:`linear-gradient(135deg, ${T.purple}15, transparent)`,borderRadius:20,border:`1px solid ${T.purple}20`}}>
+              <img src={monkeyLearn} alt="" className="tab-monkey" style={{width:72,height:72,objectFit:"contain"}} loading="lazy" />
               <div>
-                <div style={{color:T.t1,fontSize:22,fontWeight:900}}>Pochop to</div>
-                <div style={{color:T.t2,fontSize:13}}>Věci co ti ve škole neřeknou</div>
+                <div style={{color:T.t1,fontSize:24,fontWeight:900,letterSpacing:-0.5}}>Pochop to</div>
+                <div style={{color:T.t2,fontSize:13,marginTop:2}}>Věci co ti ve škole neřeknou</div>
               </div>
             </div>
             {[{icon:"♂♀",title:"Rozuměj klukům a holkám",sub:"Mars/Venus, komunikace, energie",color:T.purple},{icon:"⚔",title:"Staň se válečníkem",sub:"Goggins, Jocko, Stoici, disciplína",color:T.red},{icon:"🛡",title:"Nenech se zničit",sub:"NVC, hranice, šikana, CBT",color:T.teal},{icon:"📱",title:"Tvůj mozek vs. telefon",sub:"Haidt, dopamin, spánek, pozornost",color:T.accent},{icon:"🪞",title:"Kdo jsi?",sub:"Identita, Frankl, Jung, puberta",color:T.blue}].map((g,i)=>
-              <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,marginBottom:8,cursor:"pointer"}}>
-                <div style={{fontSize:28,width:44,textAlign:"center"}}>{g.icon}</div>
-                <div><div style={{color:T.t1,fontSize:15,fontWeight:700}}>{g.title}</div><div style={{color:T.t2,fontSize:12}}>{g.sub}</div></div>
+              <div key={i} className={`card-hover anim-slideIn anim-d${i+1}`} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:`linear-gradient(135deg, ${g.color}08, transparent)`,border:`1px solid ${g.color}15`,borderRadius:16,marginBottom:10,cursor:"pointer"}}>
+                <div style={{fontSize:26,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:`${g.color}15`,borderRadius:12}}>{g.icon}</div>
+                <div style={{flex:1}}><div style={{color:T.t1,fontSize:15,fontWeight:700}}>{g.title}</div><div style={{color:T.t2,fontSize:12,marginTop:2}}>{g.sub}</div></div>
+                <div style={{color:`${g.color}60`,fontSize:16}}>→</div>
               </div>
             )}
           </div>
@@ -599,18 +600,19 @@ export default function Index() {
 
         {/* ════════ PRACTICE TAB ════════ */}
         {tab === "practice" && (
-          <div style={{paddingTop:20}}>
-            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
-              <img src={monkeyTrain} alt="" style={{width:64,height:64,objectFit:"contain"}} loading="lazy" />
+          <div style={{paddingTop:16}} className="anim-fadeUp">
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20,padding:16,background:`linear-gradient(135deg, ${T.accent}15, transparent)`,borderRadius:20,border:`1px solid ${T.accent}20`}}>
+              <img src={monkeyTrain} alt="" className="tab-monkey" style={{width:72,height:72,objectFit:"contain"}} loading="lazy" />
               <div>
-                <div style={{color:T.t1,fontSize:22,fontWeight:900}}>Trénuj svou opici</div>
-                <div style={{color:T.t2,fontSize:13}}>Nástroje pro každý den</div>
+                <div style={{color:T.t1,fontSize:24,fontWeight:900,letterSpacing:-0.5}}>Trénuj svou opici</div>
+                <div style={{color:T.t2,fontSize:13,marginTop:2}}>Nástroje pro každý den</div>
               </div>
             </div>
             {[{icon:"🐵",title:"Opičí řev",sub:"Motivační řeči — Goggins, Jocko, Les Brown",color:T.accent},{icon:"🌬",title:"Opičí klid",sub:"Box breathing, Wim Hof, 4-7-8",color:T.teal},{icon:"🎵",title:"Opičí playlist",sub:"Metal, klasika, dramatická, příroda",color:T.purple},{icon:"🎮",title:"Opičí reset",sub:"5-4-3-2-1 grounding technika",color:T.blue}].map((g,i)=>
-              <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,marginBottom:8,cursor:"pointer"}}>
-                <div style={{fontSize:28,width:44,textAlign:"center"}}>{g.icon}</div>
-                <div><div style={{color:T.t1,fontSize:15,fontWeight:700}}>{g.title}</div><div style={{color:T.t2,fontSize:12}}>{g.sub}</div></div>
+              <div key={i} className={`card-hover anim-slideIn anim-d${i+1}`} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:`linear-gradient(135deg, ${g.color}08, transparent)`,border:`1px solid ${g.color}15`,borderRadius:16,marginBottom:10,cursor:"pointer"}}>
+                <div style={{fontSize:26,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:`${g.color}15`,borderRadius:12}}>{g.icon}</div>
+                <div style={{flex:1}}><div style={{color:T.t1,fontSize:15,fontWeight:700}}>{g.title}</div><div style={{color:T.t2,fontSize:12,marginTop:2}}>{g.sub}</div></div>
+                <div style={{color:`${g.color}60`,fontSize:16}}>→</div>
               </div>
             )}
           </div>
