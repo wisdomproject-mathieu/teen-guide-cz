@@ -443,17 +443,19 @@ export default function Index() {
             {/* STEP 1 */}
             {step === 1 && (
               <>
-                <div style={{marginBottom:20}}>
-                  <div style={{color:T.t1,fontSize:20,fontWeight:800}}>Jak se dnes cítíš?</div>
-                  <div style={{color:T.t2,fontSize:13}}>Klikni na náladu — opice tě provede dál</div>
+                <div className="anim-fadeUp" style={{marginBottom:20}}>
+                  <div style={{color:T.t1,fontSize:22,fontWeight:900}}>Jak se dnes cítíš?</div>
+                  <div style={{color:T.t2,fontSize:13,marginTop:4}}>Vyber náladu — tvoje opice ti poradí</div>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {MOODS.map(m => (
-                    <button key={m.id} onClick={()=>selectMood(m)} style={{display:"flex",alignItems:"center",gap:14,padding:"16px 18px",background:`${m.color}08`,border:`1px solid ${m.color}20`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
-                      <span style={{fontSize:28}}>{m.emoji}</span>
-                      <div>
-                        <div style={{color:T.t1,fontSize:16,fontWeight:700}}>{m.label}</div>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {MOODS.map((m, i) => (
+                    <button key={m.id} onClick={()=>selectMood(m)} className={`mood-btn anim-fadeUp anim-d${i+1}`} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 16px",background:`linear-gradient(135deg, ${m.color}12, ${m.color}06)`,border:`1px solid ${m.color}25`,borderRadius:18,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                      <img src={MOOD_MONKEY[m.id]} alt={m.label} style={{width:52,height:52,objectFit:"contain",borderRadius:12}} />
+                      <div style={{flex:1}}>
+                        <div style={{color:T.t1,fontSize:16,fontWeight:800}}>{m.label}</div>
+                        <div style={{color:T.t2,fontSize:11,marginTop:2}}>{m.emoji}</div>
                       </div>
+                      <div style={{color:`${m.color}80`,fontSize:18}}>→</div>
                     </button>
                   ))}
                 </div>
