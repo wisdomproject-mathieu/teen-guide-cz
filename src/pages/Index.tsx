@@ -756,6 +756,7 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
   const [musicGenre, setMusicGenre] = useState<typeof SOS_MUSIC_GENRES[0]|null>(null);
   const [musicLoading, setMusicLoading] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(false);
+  const [musicError, setMusicError] = useState<string|null>(null);
   const musicAudioRef = useRef<HTMLAudioElement|null>(null);
 
   const pickRandomSpeech = () => {
@@ -765,29 +766,30 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
   };
 
   const playMusic = async (genre: typeof SOS_MUSIC_GENRES[0]) => {
-    // Stop current if playing
     if (musicAudioRef.current) { musicAudioRef.current.pause(); musicAudioRef.current = null; }
     setMusicGenre(genre);
     setMusicLoading(true);
     setMusicPlaying(false);
+    setMusicError(null);
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-music`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-        body: JSON.stringify({ prompt: genre.prompt, duration: 30 }),
+        body: JSON.stringify({ prompt: genre.prompt, duration: 22 }),
       });
-      if (!response.ok) throw new Error("Music failed");
+      if (!response.ok) throw new Error("Music generation failed");
       const blob = await response.blob();
+      if (blob.size < 1000) throw new Error("Empty audio");
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       musicAudioRef.current = audio;
       audio.loop = true;
       audio.onended = () => setMusicPlaying(false);
-      audio.onerror = () => { setMusicPlaying(false); setMusicLoading(false); };
+      audio.onerror = () => { setMusicPlaying(false); setMusicLoading(false); setMusicError("Přehrávání selhalo"); };
       await audio.play();
       setMusicPlaying(true);
-    } catch {
-      // Silent fail
+    } catch (e: any) {
+      setMusicError("Generování selhalo. Zkus to znovu.");
     }
     setMusicLoading(false);
   };
@@ -881,7 +883,12 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
       </div>
       {musicLoading && (
         <div style={{color:T.accent,fontSize:14,fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
-          <span style={{animation:"pulse 1.5s infinite"}}>⏳</span> Generuji hudbu…
+          <span style={{animation:"pulse 1.5s infinite"}}>⏳</span> Generuji hudbu… (může trvat ~15s)
+        </div>
+      )}
+      {musicError && !musicLoading && (
+        <div style={{color:T.red,fontSize:13,fontWeight:600,textAlign:"center",padding:"8px 16px",background:T.redDim,borderRadius:10,maxWidth:340}}>
+          ⚠️ {musicError}
         </div>
       )}
       {musicPlaying && musicGenre && (
