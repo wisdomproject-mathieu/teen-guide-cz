@@ -620,16 +620,18 @@ export default function Index() {
       </div>
 
       {/* ── BOTTOM NAV ── */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",padding:"8px 0 12px",borderTop:`1px solid ${T.border}`,background:T.bg,flexShrink:0}}>
-        <button onClick={()=>{setTab("feel");resetFlow()}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="feel"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
-          <span style={{fontSize:20}}>💭</span>CÍTÍM
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",padding:"6px 0 10px",borderTop:`1px solid ${T.border}`,background:`linear-gradient(to top, ${T.bg}, rgba(10,12,19,0.95))`,flexShrink:0}}>
+        <button onClick={()=>{setTab("feel");resetFlow()}} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="feel"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
+          <img src={monkeyHero} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="feel"?1:0.5,transition:"opacity .2s"}} />CÍTÍM
         </button>
-        <button onClick={()=>setShowSOS(true)} style={{width:62,height:62,borderRadius:"50%",background:`radial-gradient(circle,${T.red},#CC2040)`,border:"3px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,cursor:"pointer",boxShadow:`0 4px 24px ${T.red}50`,transform:"translateY(-10px)",animation:"pulse 3s infinite"}}>🆘</button>
-        <button onClick={()=>setTab("learn")} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="learn"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
-          <span style={{fontSize:20}}>💡</span>POCHOP TO
+        <button onClick={()=>setShowSOS(true)} className="nav-btn" style={{width:62,height:62,borderRadius:"50%",background:`radial-gradient(circle,${T.red},#CC2040)`,border:"3px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:`0 4px 24px ${T.red}50`,transform:"translateY(-10px)",animation:"pulse 3s infinite"}}>
+          <img src={monkeySos} alt="SOS" style={{width:36,height:36,objectFit:"contain"}} />
         </button>
-        <button onClick={()=>setTab("practice")} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="practice"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
-          <span style={{fontSize:20}}>🐵</span>TRÉNUJ
+        <button onClick={()=>setTab("learn")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="learn"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
+          <img src={monkeyLearn} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="learn"?1:0.5,transition:"opacity .2s"}} />POCHOP TO
+        </button>
+        <button onClick={()=>setTab("practice")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="practice"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
+          <img src={monkeyTrain} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="practice"?1:0.5,transition:"opacity .2s"}} />TRÉNUJ
         </button>
       </div>
     </div>
