@@ -1,7 +1,33 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import monkeyHero from "@/assets/monkey-hero.png";
+import monkeySad from "@/assets/monkey-sad.png";
+import monkeyAngry from "@/assets/monkey-angry.png";
+import monkeyZen from "@/assets/monkey-zen.png";
+import monkeyAnxious from "@/assets/monkey-anxious.png";
+import monkeySos from "@/assets/monkey-sos.png";
+import monkeyLearn from "@/assets/monkey-learn.png";
+import monkeyTrain from "@/assets/monkey-train.png";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+// Mood-to-monkey mapping
+const MOOD_MONKEY: Record<string, string> = {
+  great: monkeyHero,
+  ok: monkeyHero,
+  meh: monkeyAnxious,
+  bad: monkeySad,
+  awful: monkeySad,
+};
+const EMO_MONKEY: Record<string, string> = {
+  anger: monkeyAngry,
+  sadness: monkeySad,
+  anxiety: monkeyAnxious,
+  fear: monkeyAnxious,
+  lonely: monkeySad,
+  overwhelm: monkeyZen,
+  all: monkeyHero,
+};
 
 const T={bg:"#0A0C13",accent:"#FF7A2F",accentDim:"rgba(255,122,47,0.12)",teal:"#00D4AA",tealDim:"rgba(0,212,170,0.12)",red:"#FF3B5C",redDim:"rgba(255,59,92,0.12)",blue:"#4A8FFF",purple:"#A855F7",t1:"#F0EEFF",t2:"#9298B4",t3:"#5A6080",card:"rgba(255,255,255,0.04)",border:"rgba(255,255,255,0.08)"};
 
