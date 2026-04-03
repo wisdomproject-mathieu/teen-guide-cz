@@ -628,9 +628,9 @@ export default function Index() {
                 <div style={{color:T.t2,fontSize:13,marginTop:2}}>Nástroje pro každý den</div>
               </div>
             </div>
-            {[{icon:"🐵",title:"Opičí řev",sub:"Motivační řeči — Goggins, Jocko, Les Brown",color:T.accent},{icon:"🌬",title:"Opičí klid",sub:"Box breathing, Wim Hof, 4-7-8",color:T.teal},{icon:"🎵",title:"Opičí playlist",sub:"Metal, klasika, dramatická, příroda",color:T.purple},{icon:"🎮",title:"Opičí reset",sub:"5-4-3-2-1 grounding technika",color:T.blue}].map((g,i)=>
+            {[{img:monkeyAngry,title:"Opičí řev",sub:"Motivační řeči — Goggins, Jocko, Les Brown",color:T.accent},{img:monkeyZen,title:"Opičí klid",sub:"Box breathing, Wim Hof, 4-7-8",color:T.teal},{img:monkeyMusic,title:"Opičí playlist",sub:"Metal, klasika, dramatická, příroda",color:T.purple},{img:monkeyGamer,title:"Opičí reset",sub:"5-4-3-2-1 grounding technika",color:T.blue}].map((g,i)=>
               <div key={i} className={`card-hover anim-slideIn anim-d${i+1}`} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:`linear-gradient(135deg, ${g.color}08, transparent)`,border:`1px solid ${g.color}15`,borderRadius:16,marginBottom:10,cursor:"pointer"}}>
-                <div style={{fontSize:26,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:`${g.color}15`,borderRadius:12}}>{g.icon}</div>
+                <img src={g.img} alt={g.title} style={{width:44,height:44,objectFit:"contain",borderRadius:12}} loading="lazy" />
                 <div style={{flex:1}}><div style={{color:T.t1,fontSize:15,fontWeight:700}}>{g.title}</div><div style={{color:T.t2,fontSize:12,marginTop:2}}>{g.sub}</div></div>
                 <div style={{color:`${g.color}60`,fontSize:16}}>→</div>
               </div>
