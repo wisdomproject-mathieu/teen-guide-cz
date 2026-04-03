@@ -25,6 +25,12 @@ import monkeyPumped from "@/assets/monkey-pumped.png";
 import monkeySadMood from "@/assets/monkey-sad-mood.png";
 import monkeyChat from "@/assets/monkey-chat.png";
 import monkeyProfile from "@/assets/monkey-profile.png";
+import monkeyQuests from "@/assets/monkey-quests.png";
+import monkeySkinKing from "@/assets/monkey-skin-king.png";
+import monkeySkinAstro from "@/assets/monkey-skin-astro.png";
+import monkeySkinNinja from "@/assets/monkey-skin-ninja.png";
+import monkeySkinFire from "@/assets/monkey-skin-fire.png";
+import monkeySkinDiamond from "@/assets/monkey-skin-diamond.png";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
