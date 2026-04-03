@@ -867,6 +867,8 @@ export default function Index() {
       `}</style>
       <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatar} style={{display:"none"}}/>
       {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)}/>}
+      {xpPopup && <XpPopup xp={xpPopup.xp} label={xpPopup.label} onDone={() => setXpPopup(null)} />}
+      {levelUp && <LevelUpOverlay level={levelUp.level} skin={levelUp.skin} onDone={() => setLevelUp(null)} />}
 
       <div style={{flex:1,overflowY:"auto",padding:"0 16px 16px",display:"flex",flexDirection:"column"}}>
         {/* ════════ FEEL TAB ════════ */}
