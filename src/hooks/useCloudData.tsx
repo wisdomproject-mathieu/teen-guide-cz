@@ -47,6 +47,7 @@ export function useCloudData() {
         setXp(progressRes.data.xp || 0);
         setStreakCount(progressRes.data.streak_count || 0);
         setCompletedQuests((progressRes.data.completed_quests as string[]) || []);
+        setLastCheckinDate(progressRes.data.last_checkin_date || null);
       }
 
       setLoading(false);
