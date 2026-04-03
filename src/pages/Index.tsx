@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useCloudData } from "@/hooks/useCloudData";
+import Onboarding from "@/components/Onboarding";
 import { useAuth } from "@/hooks/useAuth";
 import monkeyHero from "@/assets/monkey-hero.png";
 import monkeySad from "@/assets/monkey-sad.png";
@@ -988,8 +989,9 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
 export default function Index() {
   const { signOut } = useAuth();
   const cloud = useCloudData();
-  const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName } = cloud;
+  const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName, loading: cloudLoading } = cloud;
 
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [tab, setTab] = useState("feel");
   const [showSOS, setShowSOS] = useState(false);
   const [avatar, setAvatar] = useState<string|null>(null);
@@ -1000,6 +1002,21 @@ export default function Index() {
   const [selectedMood, setSelectedMood] = useState<any>(null);
   const [selectedReason, setSelectedReason] = useState<any>(null);
   const [recs, setRecs] = useState<any>(null);
+
+  // Show onboarding for new users (no name set yet)
+  useEffect(() => {
+    if (!cloudLoading && !userName) setShowOnboarding(true);
+  }, [cloudLoading, userName]);
+
+  const handleOnboardingComplete = (newName: string, moodId: string) => {
+    cloud.updateName(newName);
+    const mood = MOODS.find(m => m.id === moodId);
+    if (mood) {
+      setSelectedMood(mood);
+      setStep(2); // go to reason selection
+    }
+    setShowOnboarding(false);
+  };
 
   const handleNameChange = (n: string) => { cloud.updateName(n); };
   const handleAvatar = (e: any) => {
@@ -1046,7 +1063,15 @@ export default function Index() {
 
   const lastMoodMonkey = selectedMood ? MOOD_MONKEY[selectedMood.id] : (moodLog.length > 0 ? MOOD_MONKEY[moodLog[0].mood.id] : null);
 
+  if (cloudLoading) return (
+    <div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0A0C13"}}>
+      <img src={monkeyHero} alt="" style={{width:80,height:80,objectFit:"contain",animation:"float 2s ease-in-out infinite"}} />
+    </div>
+  );
+
   return (
+    <>
+    {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
     <div style={{maxWidth:430,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",background:T.bg,fontFamily:"'Segoe UI',system-ui,sans-serif",color:T.t1,overflow:"hidden"}}>
       <style>{`
         @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
@@ -1315,5 +1340,6 @@ export default function Index() {
         </button>
       </div>
     </div>
+    </>
   );
 }
