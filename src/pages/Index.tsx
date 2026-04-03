@@ -457,6 +457,9 @@ export default function Index() {
   const [showSOS, setShowSOS] = useState(false);
   const [moodLog, setMoodLog] = useState<any[]>([]);
   const [streakCount, setStreakCount] = useState(0);
+  const [xp, setXp] = useState(() => Number(localStorage.getItem("mm_xp") || "0"));
+  const [completedQuests, setCompletedQuests] = useState<string[]>(() => JSON.parse(localStorage.getItem("mm_quests") || "[]"));
+  const [equippedSkin, setEquippedSkin] = useState(() => localStorage.getItem("mm_skin") || "default");
   const [userName, setUserName] = useState(() => localStorage.getItem("mm_name") || "");
   const [avatar, setAvatar] = useState<string|null>(() => localStorage.getItem("mm_avatar"));
   const fileRef = useRef<HTMLInputElement>(null);
