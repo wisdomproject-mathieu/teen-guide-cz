@@ -1149,6 +1149,7 @@ export default function Index() {
             {/* STEP 1 — mood grid */}
             {step === 1 && (
               <>
+                <InAppNotifications lastCheckinDate={lastCheckinDate} streakCount={streakCount} userName={userName} onNavigate={(t) => { setTab(t); resetFlow(); }} />
                 <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:14,marginBottom:16,padding:16,background:`linear-gradient(135deg, ${T.accent}15, transparent)`,borderRadius:20,border:`1px solid ${T.accent}20`}}>
                   <img src={monkeyHero} alt="" className="tab-monkey" style={{width:64,height:64,objectFit:"contain"}} />
                   <div>
