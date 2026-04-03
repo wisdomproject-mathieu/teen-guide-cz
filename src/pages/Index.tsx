@@ -475,6 +475,21 @@ export default function Index() {
     if (f) { const r = new FileReader(); r.onload = (ev: any) => { setAvatar(ev.target.result); localStorage.setItem("mm_avatar", ev.target.result); }; r.readAsDataURL(f); }
   };
 
+  const completeQuest = (questId: string) => {
+    const key = `${new Date().toISOString().split("T")[0]}:${questId}`;
+    if (completedQuests.includes(key)) return;
+    const quest = DAILY_QUESTS.find(q => q.id === questId);
+    if (!quest) return;
+    const newQ = [...completedQuests, key];
+    setCompletedQuests(newQ);
+    localStorage.setItem("mm_quests", JSON.stringify(newQ));
+    const newXp = xp + quest.xp;
+    setXp(newXp);
+    localStorage.setItem("mm_xp", String(newXp));
+  };
+  const equipSkin = (id: string) => { setEquippedSkin(id); localStorage.setItem("mm_skin", id); };
+  const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
+
   const selectMood = (m: any) => { setSelectedMood(m); setStep(2); };
   const selectReason = (r: any) => {
     setSelectedReason(r);
@@ -482,6 +497,9 @@ export default function Index() {
     setStreakCount(p => p + 1);
     setRecs(getRecommendations(selectedMood, r));
     setStep(3);
+    completeQuest("checkin");
+    if (streakCount + 1 >= 3) completeQuest("streak3");
+    if (streakCount + 1 >= 7) completeQuest("streak7");
   };
   const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); };
 
