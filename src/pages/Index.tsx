@@ -784,11 +784,24 @@ export default function Index() {
     const newQ = [...completedQuests, key];
     setCompletedQuests(newQ);
     localStorage.setItem("mm_quests", JSON.stringify(newQ));
+    const oldLevel = Math.floor(xp / 100) + 1;
     const newXp = xp + quest.xp;
+    const newLevel = Math.floor(newXp / 100) + 1;
     setXp(newXp);
     localStorage.setItem("mm_xp", String(newXp));
+    // XP popup
+    setXpPopup({ xp: quest.xp, label: quest.label });
+    // Level up check
+    if (newLevel > oldLevel) {
+      const newSkin = MONKEY_SKINS.find(s => s.xpNeeded <= newXp && s.xpNeeded > xp) || null;
+      setTimeout(() => setLevelUp({ level: newLevel, skin: newSkin }), 1200);
+    }
   };
-  const equipSkin = (id: string) => { setEquippedSkin(id); localStorage.setItem("mm_skin", id); };
+  const equipSkin = (id: string) => {
+    setEquippedSkin(id); localStorage.setItem("mm_skin", id);
+    const skin = MONKEY_SKINS.find(s => s.id === id);
+    if (skin) setXpPopup({ xp: 0, label: `${skin.name} nasazen!` });
+  };
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
   const selectMood = (m: any) => { setSelectedMood(m); setStep(2); };
