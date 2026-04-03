@@ -1009,22 +1009,26 @@ export default function Index() {
         )}
       </div>
 
-      {/* ── BOTTOM NAV (3 tabs + SOS) ── */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",padding:"6px 0 10px",borderTop:`1px solid ${T.border}`,background:`linear-gradient(to top, ${T.bg}, rgba(10,12,19,0.95))`,flexShrink:0}}>
-        <button onClick={()=>{setTab("feel");if(tab==="feel")resetFlow()}} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="feel"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
-          <img src={monkeyHero} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="feel"?1:0.5,transition:"opacity .2s"}} />CÍTÍM
+      {/* ── BOTTOM NAV (4 tabs + SOS) ── */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",padding:"4px 0 8px",borderTop:`1px solid ${T.border}`,background:`linear-gradient(to top, ${T.bg}, rgba(10,12,19,0.95))`,flexShrink:0}}>
+        <button onClick={()=>{setTab("feel");if(tab==="feel")resetFlow()}} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"8px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="feel"?T.accent:T.t3,fontSize:9,fontWeight:700}}>
+          <img src={monkeyHero} alt="" style={{width:24,height:24,objectFit:"contain",opacity:tab==="feel"?1:0.5,transition:"opacity .2s"}} />CÍTÍM
         </button>
 
-        <button onClick={()=>setTab("quests")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="quests"?T.teal:T.t3,fontSize:10,fontWeight:700}}>
-          <img src={monkeyQuests} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="quests"?1:0.5,transition:"opacity .2s"}} />VÝZVY
+        <button onClick={()=>setTab("chat")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"8px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="chat"?T.teal:T.t3,fontSize:9,fontWeight:700}}>
+          <img src={monkeyChat} alt="" style={{width:24,height:24,objectFit:"contain",opacity:tab==="chat"?1:0.5,transition:"opacity .2s"}} />OPIČÁK
         </button>
 
-        <button onClick={()=>setShowSOS(true)} className="nav-btn" style={{width:58,height:58,borderRadius:"50%",background:`radial-gradient(circle,${T.red},#CC2040)`,border:"3px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:`0 4px 24px ${T.red}50`,transform:"translateY(-10px)",animation:"pulse 3s infinite",flexShrink:0}}>
-          <img src={monkeySos} alt="SOS" style={{width:32,height:32,objectFit:"contain"}} />
+        <button onClick={()=>setShowSOS(true)} className="nav-btn" style={{width:52,height:52,borderRadius:"50%",background:`radial-gradient(circle,${T.red},#CC2040)`,border:"3px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:`0 4px 24px ${T.red}50`,transform:"translateY(-8px)",animation:"pulse 3s infinite",flexShrink:0}}>
+          <img src={monkeySos} alt="SOS" style={{width:28,height:28,objectFit:"contain"}} />
         </button>
 
-        <button onClick={()=>setTab("profile")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="profile"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
-          <img src={monkeyProfile} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="profile"?1:0.5,transition:"opacity .2s"}} />PROFIL
+        <button onClick={()=>setTab("quests")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"8px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="quests"?T.accent:T.t3,fontSize:9,fontWeight:700}}>
+          <img src={monkeyQuests} alt="" style={{width:24,height:24,objectFit:"contain",opacity:tab==="quests"?1:0.5,transition:"opacity .2s"}} />VÝZVY
+        </button>
+
+        <button onClick={()=>setTab("profile")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"8px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="profile"?T.accent:T.t3,fontSize:9,fontWeight:700}}>
+          <img src={monkeyProfile} alt="" style={{width:24,height:24,objectFit:"contain",opacity:tab==="profile"?1:0.5,transition:"opacity .2s"}} />PROFIL
         </button>
       </div>
     </div>
