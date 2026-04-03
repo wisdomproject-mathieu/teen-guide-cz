@@ -11,6 +11,7 @@ export function useCloudData() {
   const [completedQuests, setCompletedQuests] = useState<string[]>([]);
   const [equippedSkin, setEquippedSkin] = useState("default");
   const [userName, setUserName] = useState("");
+  const [lastCheckinDate, setLastCheckinDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Load all data on mount
@@ -46,6 +47,7 @@ export function useCloudData() {
         setXp(progressRes.data.xp || 0);
         setStreakCount(progressRes.data.streak_count || 0);
         setCompletedQuests((progressRes.data.completed_quests as string[]) || []);
+        setLastCheckinDate(progressRes.data.last_checkin_date || null);
       }
 
       setLoading(false);
@@ -99,7 +101,7 @@ export function useCloudData() {
 
   return {
     loading, moodLog, xp, streakCount, completedQuests,
-    equippedSkin, userName, profile,
+    equippedSkin, userName, profile, lastCheckinDate,
     updateName, updateSkin, logMood, updateProgress,
     setMoodLog, setXp, setStreakCount, setCompletedQuests,
   };

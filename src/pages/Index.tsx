@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useCloudData } from "@/hooks/useCloudData";
 import Onboarding from "@/components/Onboarding";
+import InAppNotifications from "@/components/InAppNotifications";
 import { useAuth } from "@/hooks/useAuth";
 import monkeyHero from "@/assets/monkey-hero.png";
 import monkeySad from "@/assets/monkey-sad.png";
@@ -989,7 +990,7 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
 export default function Index() {
   const { signOut } = useAuth();
   const cloud = useCloudData();
-  const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName, loading: cloudLoading } = cloud;
+  const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName, lastCheckinDate, loading: cloudLoading } = cloud;
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [tab, setTab] = useState("feel");
@@ -1148,6 +1149,7 @@ export default function Index() {
             {/* STEP 1 — mood grid */}
             {step === 1 && (
               <>
+                <InAppNotifications lastCheckinDate={lastCheckinDate} streakCount={streakCount} userName={userName} onNavigate={(t) => { setTab(t); resetFlow(); }} />
                 <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:14,marginBottom:16,padding:16,background:`linear-gradient(135deg, ${T.accent}15, transparent)`,borderRadius:20,border:`1px solid ${T.accent}20`}}>
                   <img src={monkeyHero} alt="" className="tab-monkey" style={{width:64,height:64,objectFit:"contain"}} />
                   <div>
