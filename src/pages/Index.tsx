@@ -694,7 +694,41 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
   );
 }
 
-// ── SOS OVERLAY ──
+// ── XP POPUP ──
+function XpPopup({ xp, label, onDone }: { xp: number; label: string; onDone: () => void }) {
+  useEffect(() => { const t = setTimeout(onDone, 2200); return () => clearTimeout(t); }, [onDone]);
+  return (
+    <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:10000,pointerEvents:"none",textAlign:"center",animation:"xpPopIn .4s cubic-bezier(.36,1.1,.3,1) both"}}>
+      <div style={{fontSize:48,fontWeight:900,color:T.accent,textShadow:`0 0 30px ${T.accent}80, 0 0 60px ${T.accent}40`,animation:"xpFloat 2s ease-out both"}}>+{xp} XP</div>
+      <div style={{fontSize:16,fontWeight:700,color:T.t1,marginTop:4,opacity:0.9}}>{label}</div>
+    </div>
+  );
+}
+
+// ── LEVEL UP CELEBRATION ──
+function LevelUpOverlay({ level, skin, onDone }: { level: number; skin?: typeof MONKEY_SKINS[0] | null; onDone: () => void }) {
+  useEffect(() => { const t = setTimeout(onDone, 3500); return () => clearTimeout(t); }, [onDone]);
+  return (
+    <div onClick={onDone} style={{position:"fixed",inset:0,zIndex:10001,background:"rgba(0,0,0,0.85)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,cursor:"pointer",animation:"fadeIn .3s ease-out both"}}>
+      {/* Particles */}
+      {Array.from({length:20}).map((_,i) => (
+        <div key={i} style={{position:"absolute",width:8,height:8,borderRadius:"50%",background:[T.accent,T.teal,T.purple,"#FFD700",T.red][i%5],top:"50%",left:"50%",animation:`particle${i%4} ${1.5+Math.random()}s ease-out both`,animationDelay:`${Math.random()*0.3}s`,opacity:0}} />
+      ))}
+      <div style={{fontSize:64,animation:"bounceIn .5s cubic-bezier(.36,1.1,.3,1) both"}}>🎉</div>
+      <div style={{fontSize:32,fontWeight:900,color:T.accent,textShadow:`0 0 20px ${T.accent}60`,animation:"bounceIn .5s cubic-bezier(.36,1.1,.3,1) both",animationDelay:".1s"}}>LEVEL {level}!</div>
+      {skin && (
+        <div style={{animation:"bounceIn .6s cubic-bezier(.36,1.1,.3,1) both",animationDelay:".3s",textAlign:"center"}}>
+          <div style={{fontSize:14,color:T.teal,fontWeight:700,marginBottom:8}}>🔓 Nový skin odemčen!</div>
+          <img src={skin.img} alt={skin.name} style={{width:100,height:100,objectFit:"contain",filter:`drop-shadow(0 0 20px ${skin.color}60)`,animation:"float 2s ease-in-out infinite"}} />
+          <div style={{color:T.t1,fontSize:16,fontWeight:800,marginTop:8}}>{skin.name}</div>
+        </div>
+      )}
+      <div style={{color:T.t3,fontSize:12,marginTop:12,animation:"fadeIn .5s ease-out both",animationDelay:".5s"}}>Klikni kamkoliv</div>
+    </div>
+  );
+}
+
+
 function SOSOverlay({onClose}: {onClose:()=>void}) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,padding:24}}>
@@ -729,7 +763,8 @@ export default function Index() {
   const [userName, setUserName] = useState(() => localStorage.getItem("mm_name") || "");
   const [avatar, setAvatar] = useState<string|null>(() => localStorage.getItem("mm_avatar"));
   const fileRef = useRef<HTMLInputElement>(null);
-
+  const [xpPopup, setXpPopup] = useState<{xp:number;label:string}|null>(null);
+  const [levelUp, setLevelUp] = useState<{level:number;skin?:typeof MONKEY_SKINS[0]|null}|null>(null);
   const [step, setStep] = useState(1);
   const [selectedMood, setSelectedMood] = useState<any>(null);
   const [selectedReason, setSelectedReason] = useState<any>(null);
@@ -749,11 +784,24 @@ export default function Index() {
     const newQ = [...completedQuests, key];
     setCompletedQuests(newQ);
     localStorage.setItem("mm_quests", JSON.stringify(newQ));
+    const oldLevel = Math.floor(xp / 100) + 1;
     const newXp = xp + quest.xp;
+    const newLevel = Math.floor(newXp / 100) + 1;
     setXp(newXp);
     localStorage.setItem("mm_xp", String(newXp));
+    // XP popup
+    setXpPopup({ xp: quest.xp, label: quest.label });
+    // Level up check
+    if (newLevel > oldLevel) {
+      const newSkin = MONKEY_SKINS.find(s => s.xpNeeded <= newXp && s.xpNeeded > xp) || null;
+      setTimeout(() => setLevelUp({ level: newLevel, skin: newSkin }), 1200);
+    }
   };
-  const equipSkin = (id: string) => { setEquippedSkin(id); localStorage.setItem("mm_skin", id); };
+  const equipSkin = (id: string) => {
+    setEquippedSkin(id); localStorage.setItem("mm_skin", id);
+    const skin = MONKEY_SKINS.find(s => s.id === id);
+    if (skin) setXpPopup({ xp: 0, label: `${skin.name} nasazen!` });
+  };
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
   const selectMood = (m: any) => { setSelectedMood(m); setStep(2); };
@@ -781,6 +829,12 @@ export default function Index() {
         @keyframes bounceIn{0%{opacity:0;transform:scale(0.6)}60%{transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}
         @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
         @keyframes glowPulse{0%,100%{box-shadow:0 0 8px rgba(255,122,47,0.2)}50%{box-shadow:0 0 20px rgba(255,122,47,0.4)}}
+        @keyframes xpPopIn{0%{opacity:0;transform:translate(-50%,-50%) scale(0.3)}60%{transform:translate(-50%,-50%) scale(1.15)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+        @keyframes xpFloat{0%{opacity:1;transform:translateY(0)}70%{opacity:1}100%{opacity:0;transform:translateY(-60px)}}
+        @keyframes particle0{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(-80px,-120px) scale(0)}}
+        @keyframes particle1{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(90px,-100px) scale(0)}}
+        @keyframes particle2{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(-60px,80px) scale(0)}}
+        @keyframes particle3{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(70px,90px) scale(0)}}
         @keyframes monkeyBob{0%,100%{transform:translateY(0) rotate(0deg)}25%{transform:translateY(-4px) rotate(-3deg)}75%{transform:translateY(-2px) rotate(3deg)}}
         .anim-fadeUp{animation:fadeUp .4s ease-out both}
         .anim-fadeIn{animation:fadeIn .3s ease-out both}
@@ -813,6 +867,8 @@ export default function Index() {
       `}</style>
       <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatar} style={{display:"none"}}/>
       {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)}/>}
+      {xpPopup && <XpPopup xp={xpPopup.xp} label={xpPopup.label} onDone={() => setXpPopup(null)} />}
+      {levelUp && <LevelUpOverlay level={levelUp.level} skin={levelUp.skin} onDone={() => setLevelUp(null)} />}
 
       <div style={{flex:1,overflowY:"auto",padding:"0 16px 16px",display:"flex",flexDirection:"column"}}>
         {/* ════════ FEEL TAB ════════ */}
