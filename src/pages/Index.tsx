@@ -391,7 +391,34 @@ export default function Index() {
 
   return (
     <div style={{maxWidth:430,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",background:T.bg,fontFamily:"'Segoe UI',system-ui,sans-serif",color:T.t1,overflow:"hidden"}}>
-      <style>{`@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}*{box-sizing:border-box;margin:0;padding:0}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:${T.t3};border-radius:4px}input::placeholder,textarea::placeholder{color:${T.t3}}`}</style>
+      <style>{`
+        @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        @keyframes slideInRight{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes bounceIn{0%{opacity:0;transform:scale(0.6)}60%{transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+        @keyframes glowPulse{0%,100%{box-shadow:0 0 8px rgba(255,122,47,0.2)}50%{box-shadow:0 0 20px rgba(255,122,47,0.4)}}
+        .anim-fadeUp{animation:fadeUp .4s ease-out both}
+        .anim-fadeIn{animation:fadeIn .3s ease-out both}
+        .anim-slideIn{animation:slideInRight .4s ease-out both}
+        .anim-bounce{animation:bounceIn .5s cubic-bezier(.36,1.1,.3,1) both}
+        .anim-float{animation:float 3s ease-in-out infinite}
+        .anim-d1{animation-delay:.05s}.anim-d2{animation-delay:.1s}.anim-d3{animation-delay:.15s}.anim-d4{animation-delay:.2s}.anim-d5{animation-delay:.25s}
+        .mood-btn{transition:all .2s ease;position:relative;overflow:hidden}
+        .mood-btn:hover{transform:scale(1.02);filter:brightness(1.15)}
+        .mood-btn:active{transform:scale(0.97)}
+        .card-hover{transition:all .2s ease}
+        .card-hover:hover{transform:translateY(-2px);border-color:rgba(255,122,47,0.3)!important}
+        .card-hover:active{transform:scale(0.98)}
+        .nav-btn{transition:all .2s ease}
+        .nav-btn:hover{transform:scale(1.1)}
+        .tab-monkey{transition:all .3s ease}
+        .tab-monkey:hover{transform:scale(1.05) rotate(-3deg)}
+        *{box-sizing:border-box;margin:0;padding:0}
+        ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:${T.t3};border-radius:4px}
+        input::placeholder,textarea::placeholder{color:${T.t3}}
+      `}</style>
       {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)}/>}
       {showProfile && <ProfilePanel onClose={()=>setShowProfile(false)} moodLog={moodLog} streakCount={streakCount}/>}
 
