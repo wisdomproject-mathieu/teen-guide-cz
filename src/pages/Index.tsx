@@ -341,7 +341,7 @@ function ProfilePanel({onClose, moodLog, streakCount}: {onClose:()=>void; moodLo
 function SOSOverlay({onClose}: {onClose:()=>void}) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,padding:24}}>
-      <div style={{width:80,height:80,borderRadius:"50%",background:`radial-gradient(circle,${T.red},${T.red}80)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,boxShadow:`0 0 60px ${T.red}40`,animation:"pulse 2s infinite"}}>🆘</div>
+      <img src={monkeySos} alt="SOS" style={{width:100,height:100,objectFit:"contain",filter:"drop-shadow(0 0 30px rgba(255,59,92,0.5))"}} />
       <div style={{color:T.t1,fontSize:22,fontWeight:800}}>Co ti teď pomůže?</div>
       {[{icon:"🎙",label:"Motivační řeč",sub:"Goggins, Jocko, Les Brown…",color:T.accent},{icon:"🤘",label:"Těžká hudba",sub:"Nech vztek ven",color:T.red},{icon:"🌬",label:"Dýchání",sub:"Box breathing",color:T.teal}].map((o,i)=>
         <button key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"16px 20px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16,width:"100%",maxWidth:340,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
