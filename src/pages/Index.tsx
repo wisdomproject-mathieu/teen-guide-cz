@@ -313,7 +313,156 @@ function QuestsTab({ xp, completedQuests, onEquipSkin, equippedSkin }: { xp: num
   );
 }
 
-// ── PROFILE TAB ──
+// ── MONKEY CHAT (AI) ──
+type ChatMsg = { role: "user" | "assistant"; content: string };
+
+function MonkeyChat() {
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || isLoading) return;
+    const userMsg: ChatMsg = { role: "user", content: text };
+    const allMsgs = [...messages, userMsg];
+    setMessages(allMsgs);
+    setInput("");
+    setIsLoading(true);
+
+    let assistantSoFar = "";
+    try {
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/monkey-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ messages: allMsgs }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: "Něco se pokazilo" }));
+        setMessages(prev => [...prev, { role: "assistant", content: err.error || "Opičák teď nemůže, zkus to znovu 🐵" }]);
+        setIsLoading(false);
+        return;
+      }
+
+      const reader = resp.body?.getReader();
+      if (!reader) throw new Error("No reader");
+      const decoder = new TextDecoder();
+      let textBuffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              assistantSoFar += content;
+              const snap = assistantSoFar;
+              setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last?.role === "assistant") return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: snap } : m);
+                return [...prev, { role: "assistant", content: snap }];
+              });
+            }
+          } catch {
+            textBuffer = line + "\n" + textBuffer;
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      if (!assistantSoFar) {
+        setMessages(prev => [...prev, { role: "assistant", content: "Opičák se zasekl... zkus to znovu 🐵" }]);
+      }
+    }
+    setIsLoading(false);
+  };
+
+  const quickStarters = ["Mám blbej den 😒", "Naštval mě kámoš", "Mám strach ze zkoušky", "Cítím se sám/a"];
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",height:"100%",paddingTop:8}}>
+      <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0 12px",borderBottom:`1px solid ${T.border}`,marginBottom:8}}>
+        <img src={monkeyChat} alt="" style={{width:48,height:48,objectFit:"contain",borderRadius:14}} />
+        <div>
+          <div style={{color:T.t1,fontSize:18,fontWeight:900}}>Opičák</div>
+          <div style={{color:T.teal,fontSize:11,fontWeight:600}}>● Online — vždycky tu pro tebe</div>
+        </div>
+      </div>
+      <div ref={scrollRef} style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,paddingBottom:8}}>
+        {messages.length === 0 && (
+          <div className="anim-fadeUp" style={{textAlign:"center",padding:"32px 16px"}}>
+            <img src={monkeyChat} alt="" className="anim-float" style={{width:80,height:80,objectFit:"contain",margin:"0 auto 16px"}} />
+            <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:6}}>Yo! Jsem Opičák 🐵</div>
+            <div style={{color:T.t2,fontSize:13,marginBottom:20,lineHeight:1.5}}>Tvůj AI brácha. Řekni mi co tě trápí, nebo prostě pokecej.</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
+              {quickStarters.map((q, i) => (
+                <button key={i} onClick={() => { setInput(q); setTimeout(() => inputRef.current?.focus(), 50); }}
+                  className="reason-card" style={{padding:"8px 14px",background:T.card,border:`1px solid ${T.border}`,borderRadius:99,color:T.t2,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {messages.map((m, i) => (
+          <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start",gap:8,padding:"2px 0"}} className="anim-fadeUp">
+            {m.role === "assistant" && <img src={monkeyChat} alt="" style={{width:28,height:28,objectFit:"contain",borderRadius:8,flexShrink:0,marginTop:4}} />}
+            <div style={{
+              maxWidth:"78%",padding:"10px 14px",borderRadius:m.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px",
+              background:m.role==="user"?`linear-gradient(135deg, ${T.accent}, ${T.accent}CC)`:T.card,
+              border:m.role==="user"?"none":`1px solid ${T.border}`,
+              color:m.role==="user"?"#fff":T.t1,fontSize:14,lineHeight:1.5,fontWeight:500,
+              whiteSpace:"pre-wrap",wordBreak:"break-word",
+            }}>
+              {m.content}
+            </div>
+          </div>
+        ))}
+        {isLoading && messages[messages.length-1]?.role !== "assistant" && (
+          <div style={{display:"flex",gap:8,padding:"2px 0"}} className="anim-fadeUp">
+            <img src={monkeyChat} alt="" style={{width:28,height:28,objectFit:"contain",borderRadius:8}} />
+            <div style={{padding:"10px 14px",background:T.card,border:`1px solid ${T.border}`,borderRadius:"16px 16px 16px 4px",color:T.t2,fontSize:14}}>
+              <span className="anim-float">🐵</span> přemýšlím...
+            </div>
+          </div>
+        )}
+      </div>
+      <div style={{display:"flex",gap:8,padding:"8px 0 4px",borderTop:`1px solid ${T.border}`}}>
+        <input ref={inputRef} value={input} onChange={e=>setInput(e.target.value)}
+          onKeyDown={e=>{ if(e.key==="Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+          placeholder="Napiš opičákovi..."
+          style={{flex:1,padding:"12px 16px",background:T.card,border:`1px solid ${T.border}`,borderRadius:99,color:T.t1,fontSize:14,fontFamily:"inherit",outline:"none"}}
+        />
+        <button onClick={send} disabled={isLoading || !input.trim()}
+          style={{width:44,height:44,borderRadius:"50%",background:input.trim()?T.accent:`${T.accent}30`,border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:input.trim()?"pointer":"default",fontSize:18,flexShrink:0,transition:"all .2s"}}>
+          ↑
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── PROFILE TAB (with Mood Insights) ──
 function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void}) {
   const [activeSection, setActiveSection] = useState("overview");
   const [contacts, setContacts] = useState([{name:"",phone:""}]);
@@ -341,7 +490,7 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
 
       {/* Section pills */}
       <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:16,paddingBottom:4}}>
-        {[{id:"overview",label:"📊 Přehled"},{id:"contacts",label:"📞 SOS"},{id:"diary",label:"📝 Deník"},{id:"calendar",label:"📅 Historie"}].map(s=>
+        {[{id:"overview",label:"📊 Přehled"},{id:"insights",label:"🧠 Insights"},{id:"contacts",label:"📞 SOS"},{id:"diary",label:"📝 Deník"},{id:"calendar",label:"📅 Historie"}].map(s=>
           <button key={s.id} onClick={()=>setActiveSection(s.id)} className="reason-card" style={{padding:"8px 14px",background:activeSection===s.id?T.accentDim:T.card,border:`1px solid ${activeSection===s.id?T.accent:T.border}`,borderRadius:99,color:activeSection===s.id?T.accent:T.t2,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",flexShrink:0}}>{s.label}</button>
         )}
       </div>
@@ -376,6 +525,123 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
             </div>
             <div style={{color:T.t2,fontSize:13,lineHeight:1.6}}>Každý den, kdy otevřeš appku a řekneš jak se cítíš, je den, kdy ovládáš svou opici. 🐵</div>
           </div>
+        </div>
+      )}
+
+      {activeSection==="insights" && (
+        <div>
+          <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:12}}>Mood Insights 🧠</div>
+          {moodLog.length < 3 ? (
+            <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:24,textAlign:"center"}}>
+              <img src={monkeyProfile} alt="" className="anim-float" style={{width:60,height:60,objectFit:"contain",margin:"0 auto 12px"}} />
+              <div style={{color:T.t2,fontSize:14,lineHeight:1.6}}>Potřebuji aspoň 3 check-iny, abych ti ukázal insights. Pokračuj! 🐵</div>
+            </div>
+          ) : (
+            <>
+              {/* Mood distribution bars */}
+              <div style={{marginBottom:20}}>
+                <div style={{color:T.t2,fontSize:13,marginBottom:8}}>Rozložení nálad</div>
+                {(() => {
+                  const counts: Record<string, number> = {};
+                  moodLog.forEach((l: any) => { counts[l.mood.id] = (counts[l.mood.id] || 0) + 1; });
+                  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                  const max = sorted[0]?.[1] || 1;
+                  return sorted.map(([moodId, count]) => {
+                    const mood = MOODS.find(m => m.id === moodId);
+                    if (!mood) return null;
+                    return (
+                      <div key={moodId} style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                        <img src={MOOD_MONKEY[moodId]} alt="" style={{width:24,height:24,objectFit:"contain"}} />
+                        <span style={{color:T.t2,fontSize:12,width:80,flexShrink:0}}>{mood.label}</span>
+                        <div style={{flex:1,height:16,background:T.card,borderRadius:8,overflow:"hidden",border:`1px solid ${T.border}`}}>
+                          <div style={{height:"100%",width:`${(count / max) * 100}%`,background:`linear-gradient(90deg, ${mood.color}60, ${mood.color})`,borderRadius:8,transition:"width .5s"}} />
+                        </div>
+                        <span style={{color:mood.color,fontSize:13,fontWeight:800,width:24,textAlign:"right"}}>{count}</span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Top reasons */}
+              <div style={{marginBottom:20}}>
+                <div style={{color:T.t2,fontSize:13,marginBottom:8}}>Nejčastější důvody</div>
+                {(() => {
+                  const counts: Record<string, number> = {};
+                  moodLog.forEach((l: any) => { if (l.reason) counts[l.reason.id] = (counts[l.reason.id] || 0) + 1; });
+                  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+                  return sorted.map(([reasonId, count]) => {
+                    const reason = REASONS.find(r => r.id === reasonId);
+                    if (!reason) return null;
+                    return (
+                      <div key={reasonId} className="reason-card" style={{display:"flex",alignItems:"center",gap:10,padding:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,marginBottom:6}}>
+                        <img src={REASON_MONKEY[reasonId]} alt="" style={{width:28,height:28,objectFit:"contain"}} />
+                        <span style={{color:T.t1,fontSize:13,fontWeight:700,flex:1}}>{reason.label}</span>
+                        <span style={{color:T.accent,fontSize:14,fontWeight:800}}>{count}×</span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Weekly trend bars */}
+              <div style={{marginBottom:20}}>
+                <div style={{color:T.t2,fontSize:13,marginBottom:8}}>Poslední 7 dní</div>
+                <div style={{display:"flex",gap:4,alignItems:"flex-end",height:80,background:T.card,borderRadius:14,border:`1px solid ${T.border}`,padding:"12px 8px"}}>
+                  {(() => {
+                    const moodScore: Record<string, number> = { great: 5, pumped: 4, meh: 3, angry: 2, sad: 2, anxious: 1, awful: 0 };
+                    const last7: number[] = [];
+                    for (let d = 6; d >= 0; d--) {
+                      const date = new Date(); date.setDate(date.getDate() - d);
+                      const ds = date.toLocaleDateString("cs-CZ");
+                      const dayLogs = moodLog.filter((l: any) => l.ts.startsWith(ds));
+                      if (dayLogs.length === 0) { last7.push(-1); continue; }
+                      const avg = dayLogs.reduce((s: number, l: any) => s + (moodScore[l.mood.id] ?? 3), 0) / dayLogs.length;
+                      last7.push(avg);
+                    }
+                    const dayLabels = ["Ne","Po","Út","St","Čt","Pá","So"];
+                    const today = new Date().getDay();
+                    return last7.map((v, i) => {
+                      const dayIdx = (today - 6 + i + 7) % 7;
+                      const h = v < 0 ? 4 : Math.max(8, (v / 5) * 56);
+                      const color = v < 0 ? T.t3 : v >= 4 ? T.teal : v >= 2.5 ? T.accent : T.red;
+                      return (
+                        <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                          <div style={{width:"100%",height:h,background:color,borderRadius:4,opacity:v<0?0.2:0.8,transition:"height .3s"}} />
+                          <span style={{color:T.t3,fontSize:9}}>{dayLabels[dayIdx]}</span>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* AI insight summary */}
+              <div style={{background:`linear-gradient(135deg, ${T.accent}10, ${T.purple}08)`,border:`1px solid ${T.accent}20`,borderRadius:16,padding:16}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <span style={{fontSize:18}}>💡</span>
+                  <span style={{color:T.t1,fontSize:14,fontWeight:700}}>Opičí analýza</span>
+                </div>
+                {(() => {
+                  const counts: Record<string, number> = {};
+                  moodLog.forEach((l: any) => { counts[l.mood.id] = (counts[l.mood.id] || 0) + 1; });
+                  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+                  const topMood = MOODS.find(m => m.id === top?.[0]);
+                  const topReasonCounts: Record<string, number> = {};
+                  moodLog.forEach((l: any) => { if (l.reason) topReasonCounts[l.reason.id] = (topReasonCounts[l.reason.id] || 0) + 1; });
+                  const topR = Object.entries(topReasonCounts).sort((a, b) => b[1] - a[1])[0];
+                  const topReason = REASONS.find(r => r.id === topR?.[0]);
+                  return (
+                    <div style={{color:T.t2,fontSize:13,lineHeight:1.6}}>
+                      Tvoje nejčastější nálada je <span style={{color:topMood?.color||T.accent,fontWeight:700}}>{topMood?.label || "?"}</span>
+                      {topReason && <>, hlavně kvůli <span style={{color:T.accent,fontWeight:700}}>{topReason.label.toLowerCase()}</span></>}.
+                      {top && Number(top[1]) >= 3 && <> Zkus se zaměřit na to, co ti pomáhá v těchto momentech. 🐵</>}
+                    </div>
+                  );
+                })()}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -701,10 +967,19 @@ export default function Index() {
                 )}
 
                 {/* Talk to Opičák CTA */}
-                <button onClick={()=>setTab("quests")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.teal}12, ${T.blue}08)`,border:`1px solid ${T.teal}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:20}}>
+                <button onClick={()=>setTab("chat")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.teal}12, ${T.blue}08)`,border:`1px solid ${T.teal}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:10}}>
+                  <img src={monkeyChat} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
+                  <div>
+                    <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Chceš si promluvit? 🐵</div>
+                    <div style={{color:T.t2,fontSize:12}}>Opičák ti pomůže — pokecej s ním</div>
+                  </div>
+                </button>
+
+                {/* Quests CTA */}
+                <button onClick={()=>setTab("quests")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.accent}08, ${T.purple}08)`,border:`1px solid ${T.accent}20`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:20}}>
                   <img src={monkeyQuests} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
                   <div>
-                    <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Splň výzvy, odemkni skiny! 🐵</div>
+                    <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Splň výzvy, odemkni skiny! ⚔️</div>
                     <div style={{color:T.t2,fontSize:12}}>Sbírej XP a vylepši svou opici</div>
                   </div>
                 </button>
@@ -722,6 +997,9 @@ export default function Index() {
           </div>
         )}
 
+        {/* ════════ CHAT TAB ════════ */}
+        {tab === "chat" && <MonkeyChat />}
+
         {/* ════════ QUESTS TAB ════════ */}
         {tab === "quests" && <QuestsTab xp={xp} completedQuests={completedQuests} onEquipSkin={equipSkin} equippedSkin={equippedSkin} />}
 
@@ -731,22 +1009,26 @@ export default function Index() {
         )}
       </div>
 
-      {/* ── BOTTOM NAV (3 tabs + SOS) ── */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",padding:"6px 0 10px",borderTop:`1px solid ${T.border}`,background:`linear-gradient(to top, ${T.bg}, rgba(10,12,19,0.95))`,flexShrink:0}}>
-        <button onClick={()=>{setTab("feel");if(tab==="feel")resetFlow()}} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="feel"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
-          <img src={monkeyHero} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="feel"?1:0.5,transition:"opacity .2s"}} />CÍTÍM
+      {/* ── BOTTOM NAV (4 tabs + SOS) ── */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",padding:"4px 0 8px",borderTop:`1px solid ${T.border}`,background:`linear-gradient(to top, ${T.bg}, rgba(10,12,19,0.95))`,flexShrink:0}}>
+        <button onClick={()=>{setTab("feel");if(tab==="feel")resetFlow()}} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"8px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="feel"?T.accent:T.t3,fontSize:9,fontWeight:700}}>
+          <img src={monkeyHero} alt="" style={{width:24,height:24,objectFit:"contain",opacity:tab==="feel"?1:0.5,transition:"opacity .2s"}} />CÍTÍM
         </button>
 
-        <button onClick={()=>setTab("quests")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="quests"?T.teal:T.t3,fontSize:10,fontWeight:700}}>
-          <img src={monkeyQuests} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="quests"?1:0.5,transition:"opacity .2s"}} />VÝZVY
+        <button onClick={()=>setTab("chat")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"8px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="chat"?T.teal:T.t3,fontSize:9,fontWeight:700}}>
+          <img src={monkeyChat} alt="" style={{width:24,height:24,objectFit:"contain",opacity:tab==="chat"?1:0.5,transition:"opacity .2s"}} />OPIČÁK
         </button>
 
-        <button onClick={()=>setShowSOS(true)} className="nav-btn" style={{width:58,height:58,borderRadius:"50%",background:`radial-gradient(circle,${T.red},#CC2040)`,border:"3px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:`0 4px 24px ${T.red}50`,transform:"translateY(-10px)",animation:"pulse 3s infinite",flexShrink:0}}>
-          <img src={monkeySos} alt="SOS" style={{width:32,height:32,objectFit:"contain"}} />
+        <button onClick={()=>setShowSOS(true)} className="nav-btn" style={{width:52,height:52,borderRadius:"50%",background:`radial-gradient(circle,${T.red},#CC2040)`,border:"3px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:`0 4px 24px ${T.red}50`,transform:"translateY(-8px)",animation:"pulse 3s infinite",flexShrink:0}}>
+          <img src={monkeySos} alt="SOS" style={{width:28,height:28,objectFit:"contain"}} />
         </button>
 
-        <button onClick={()=>setTab("profile")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="profile"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
-          <img src={monkeyProfile} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="profile"?1:0.5,transition:"opacity .2s"}} />PROFIL
+        <button onClick={()=>setTab("quests")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"8px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="quests"?T.accent:T.t3,fontSize:9,fontWeight:700}}>
+          <img src={monkeyQuests} alt="" style={{width:24,height:24,objectFit:"contain",opacity:tab==="quests"?1:0.5,transition:"opacity .2s"}} />VÝZVY
+        </button>
+
+        <button onClick={()=>setTab("profile")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"8px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="profile"?T.accent:T.t3,fontSize:9,fontWeight:700}}>
+          <img src={monkeyProfile} alt="" style={{width:24,height:24,objectFit:"contain",opacity:tab==="profile"?1:0.5,transition:"opacity .2s"}} />PROFIL
         </button>
       </div>
     </div>
