@@ -567,8 +567,13 @@ export default function Index() {
         {/* ════════ PRACTICE TAB ════════ */}
         {tab === "practice" && (
           <div style={{paddingTop:20}}>
-            <div style={{color:T.t1,fontSize:22,fontWeight:900,marginBottom:4}}>Trénuj svou opici</div>
-            <div style={{color:T.t2,fontSize:13,marginBottom:20}}>Nástroje pro každý den 🐵</div>
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
+              <img src={monkeyTrain} alt="" style={{width:64,height:64,objectFit:"contain"}} loading="lazy" />
+              <div>
+                <div style={{color:T.t1,fontSize:22,fontWeight:900}}>Trénuj svou opici</div>
+                <div style={{color:T.t2,fontSize:13}}>Nástroje pro každý den</div>
+              </div>
+            </div>
             {[{icon:"🐵",title:"Opičí řev",sub:"Motivační řeči — Goggins, Jocko, Les Brown",color:T.accent},{icon:"🌬",title:"Opičí klid",sub:"Box breathing, Wim Hof, 4-7-8",color:T.teal},{icon:"🎵",title:"Opičí playlist",sub:"Metal, klasika, dramatická, příroda",color:T.purple},{icon:"🎮",title:"Opičí reset",sub:"5-4-3-2-1 grounding technika",color:T.blue}].map((g,i)=>
               <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,marginBottom:8,cursor:"pointer"}}>
                 <div style={{fontSize:28,width:44,textAlign:"center"}}>{g.icon}</div>
