@@ -692,6 +692,11 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
           {moodLog.length === 0 && <div style={{color:T.t3,fontSize:13,textAlign:"center",padding:20}}>Zatím žádné záznamy 🐵</div>}
         </div>
       )}
+
+      {/* Sign out button */}
+      <button onClick={onSignOut} style={{marginTop:24,padding:"12px 0",width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,color:T.red,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+        Odhlásit se
+      </button>
     </div>
   );
 }
