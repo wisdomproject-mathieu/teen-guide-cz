@@ -491,7 +491,7 @@ export default function Index() {
                 {/* Breathing */}
                 <div style={{marginBottom:20}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                    <span style={{fontSize:18}}>🌬</span>
+                    <img src={monkeyZen} alt="" style={{width:32,height:32,objectFit:"contain"}} loading="lazy" />
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Zklidni opici — dýchej</span>
                   </div>
                   <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16}}>
