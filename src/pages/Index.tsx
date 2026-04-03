@@ -74,15 +74,20 @@ const SPEECHES=[
 const MOODS=[{id:"great",emoji:"😊",label:"Skvěle",color:T.teal},{id:"ok",emoji:"🙂",label:"OK",color:T.blue},{id:"meh",emoji:"😐",label:"Tak tak",color:T.accent},{id:"bad",emoji:"😔",label:"Blbě",color:T.purple},{id:"awful",emoji:"😢",label:"Na dně",color:T.red}];
 const MOOD_TO_EMO: Record<string, string>={great:"all",ok:"all",meh:"anxiety",bad:"sadness",awful:"sadness"};
 
+const REASON_MONKEY: Record<string, string> = {
+  school: monkeySchool, siblings: monkeySiblings, parents: monkeyParents,
+  friends: monkeyFriends, social: monkeySocial, identity: monkeyIdentity,
+  lonely: monkeyLonely, other: monkeyOther,
+};
 const REASONS=[
-{id:"school",icon:"📚",label:"Škola",sub:"Zkoušky, učitelé, tlak"},
-{id:"siblings",icon:"👊",label:"Sourozenci",sub:"Hádky, žárlivost"},
-{id:"parents",icon:"🏠",label:"Rodiče",sub:"Nerozumí mi, tlačí"},
-{id:"friends",icon:"👥",label:"Kamarádi",sub:"Zrada, vyloučení, tlak"},
-{id:"social",icon:"📱",label:"Sítě & mobil",sub:"Scrollování, srovnávání"},
-{id:"identity",icon:"🪞",label:"Já sám/a",sub:"Kdo jsem? Tělo, identita"},
-{id:"lonely",icon:"🌙",label:"Osamělost",sub:"Nikdo mě nechápe"},
-{id:"other",icon:"💭",label:"Jiné",sub:"Něco jiného"},
+{id:"school",label:"Škola",sub:"Zkoušky, učitelé, tlak"},
+{id:"siblings",label:"Sourozenci",sub:"Hádky, žárlivost"},
+{id:"parents",label:"Rodiče",sub:"Nerozumí mi, tlačí"},
+{id:"friends",label:"Kamarádi",sub:"Zrada, vyloučení, tlak"},
+{id:"social",label:"Sítě & mobil",sub:"Scrollování, srovnávání"},
+{id:"identity",label:"Já sám/a",sub:"Kdo jsem? Tělo, identita"},
+{id:"lonely",label:"Osamělost",sub:"Nikdo mě nechápe"},
+{id:"other",label:"Jiné",sub:"Něco jiného"},
 ];
 
 // ── RECOMMENDATION ENGINE ──
