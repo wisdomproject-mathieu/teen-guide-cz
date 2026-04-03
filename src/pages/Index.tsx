@@ -879,7 +879,7 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
   };
 
   useEffect(() => {
-    return () => { if (musicAudioRef.current) { musicAudioRef.current.pause(); } };
+    return () => { if (musicAudioRef.current) { musicAudioRef.current.pause(); } stopWebAudio(); };
   }, []);
 
   const overlay: React.CSSProperties = {position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",overflowY:"auto",padding:"24px 16px",gap:16};
