@@ -829,6 +829,12 @@ export default function Index() {
         @keyframes bounceIn{0%{opacity:0;transform:scale(0.6)}60%{transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}
         @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
         @keyframes glowPulse{0%,100%{box-shadow:0 0 8px rgba(255,122,47,0.2)}50%{box-shadow:0 0 20px rgba(255,122,47,0.4)}}
+        @keyframes xpPopIn{0%{opacity:0;transform:translate(-50%,-50%) scale(0.3)}60%{transform:translate(-50%,-50%) scale(1.15)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+        @keyframes xpFloat{0%{opacity:1;transform:translateY(0)}70%{opacity:1}100%{opacity:0;transform:translateY(-60px)}}
+        @keyframes particle0{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(-80px,-120px) scale(0)}}
+        @keyframes particle1{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(90px,-100px) scale(0)}}
+        @keyframes particle2{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(-60px,80px) scale(0)}}
+        @keyframes particle3{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(70px,90px) scale(0)}}
         @keyframes monkeyBob{0%,100%{transform:translateY(0) rotate(0deg)}25%{transform:translateY(-4px) rotate(-3deg)}75%{transform:translateY(-2px) rotate(3deg)}}
         .anim-fadeUp{animation:fadeUp .4s ease-out both}
         .anim-fadeIn{animation:fadeIn .3s ease-out both}
