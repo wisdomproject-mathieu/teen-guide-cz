@@ -990,7 +990,7 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
 export default function Index() {
   const { signOut } = useAuth();
   const cloud = useCloudData();
-  const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName, loading: cloudLoading } = cloud;
+  const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName, lastCheckinDate, loading: cloudLoading } = cloud;
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [tab, setTab] = useState("feel");
