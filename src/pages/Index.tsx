@@ -728,25 +728,172 @@ function LevelUpOverlay({ level, skin, onDone }: { level: number; skin?: typeof 
   );
 }
 
+// ── SOS CRISIS SPEECHES ──
+const SOS_SPEECHES = [
+  {id:"sos1",icon:"🔥",title:"Zastav se. Dýchej.",src:"Jocko Willink",color:T.red,text:"Hele. Zastav se. Cokoli se teď děje — přežiješ to. Jocko Willink říká: 'Dobře.' Je to těžký? Dobře. To znamená, že rosteš. Tvůj mozek teď běží na autopilotu — amygdala řídí. Ale ty jsi silnější. Nadechni se. Pomalu. Čtyři sekundy. A teď vydechni. Jsi tady. Jsi v bezpečí. A tohle přejde."},
+  {id:"sos2",icon:"💎",title:"Diamanty vznikají pod tlakem.",src:"Carl Jung",color:T.blue,text:"Víš jak vznikají diamanty? Pod obrovským tlakem a žárem. Právě teď jsi v tom tlaku. A možná to vypadá, že to nepřežiješ. Ale přežiješ. Jung říkal: z temnoty se rodí světlo. Každý velký člověk prošel tímhle. Každý. A ty taky projdeš."},
+  {id:"sos3",icon:"🧠",title:"Tvůj mozek tě klame.",src:"Neurověda",color:T.accent,text:"Víš co se teď děje? Tvůj mozek spustil fight-or-flight. Kortizol, adrenalin — všechno jede na plný. Ale tady není žádný tygr. Je to chemie. A chemie opadne. Za 6 minut bude líp. Za hodinu bude jinak. Za den budeš silnější. Drž se."},
+  {id:"sos4",icon:"⚔",title:"Přežil jsi 100% špatných dnů.",src:"Statistika",color:T.purple,text:"Hele, fakt. Podívej se zpátky. Každý jeden špatný den, co jsi měl — přežil jsi. Stoprocentní úspěšnost. Tohle není výjimka. Tohle je další den, který přežiješ. A jednou se na něj podíváš zpátky a řekneš: 'Jo, to mě posílilo.'"},
+  {id:"sos5",icon:"🐵",title:"Opice křičí. Ty ne.",src:"Monkey Mind",color:T.accent,text:"Ta opice v tvé hlavě teď řve. Skáče. Panikuje. Ale ty — ty nejsi opice. Ty jsi ten, kdo ji pozoruje. A pozorovatel má vždycky kontrolu. Nech opici řvát. Ty se nadechni. A počkej. Opice se unaví. Ty ne."},
+  {id:"sos6",icon:"🌊",title:"Vlna přijde a odejde.",src:"Mindfulness",color:T.teal,text:"Představ si, že stojíš v moři. Přišla obrovská vlna. Ale ty jsi kotva. Vlna přijde, zasáhne tě — a odejde. Vždycky odejde. Tvoje emoce je vlna. Silná, brutální, ale dočasná. Stůj pevně. Vlna odchází."},
+  {id:"sos7",icon:"🦁",title:"Odvaha = strach + akce.",src:"Brené Brown",color:"#FF3B5C",text:"Brené Brown říká: odvaha není absence strachu. Odvaha je cítit strach — a udělat další krok. Právě teď jsi odvážnější než si myslíš. Protože jsi tady. Čteš tohle. Hledáš pomoc. To je odvaha. To je síla."},
+  {id:"sos8",icon:"🧬",title:"Jsi pod rekonstrukcí.",src:"Věda",color:T.blue,text:"Tvůj mozek se mezi 12 a 25 kompletně přestavuje. Myelin, synapse, prefrontální kortex — všechno se mění. Takže když se cítíš jako bys šílel — to není bug. To je update. A update bolí. Ale výsledek stojí za to."},
+];
+
+// ── SOS MUSIC GENRES ──
+const SOS_MUSIC_GENRES = [
+  {id:"metal",label:"🤘 Metal",sub:"Nech to ven",prompt:"intense aggressive metal music, heavy drums, distorted guitars, cathartic energy, teen angst, 120bpm",color:T.red},
+  {id:"calm",label:"🧘 Klid",sub:"Utiš mysl",prompt:"calm ambient meditation music, soft pads, gentle piano, peaceful atmosphere, healing frequency, 60bpm",color:T.teal},
+  {id:"sad",label:"🌧 Smutek",sub:"Pláč je OK",prompt:"emotional melancholic piano music, cinematic sad strings, gentle rain atmosphere, introspective mood, 70bpm",color:T.blue},
+  {id:"happy",label:"☀️ Energie",sub:"Nabij se",prompt:"uplifting happy electronic music, positive vibes, synth pop, energetic beats, feel good anthem, 128bpm",color:T.accent},
+  {id:"lofi",label:"🎧 Lo-fi",sub:"Chill vibes",prompt:"lofi hip hop beats, jazzy chords, vinyl crackle, relaxing study music, chill beats, 85bpm",color:T.purple},
+  {id:"rage",label:"💥 Rage",sub:"Rozbi to",prompt:"aggressive trap beat, heavy 808 bass, dark distorted synths, raw energy, breakbeat drops, 140bpm",color:"#FF3B5C"},
+];
 
 function SOSOverlay({onClose}: {onClose:()=>void}) {
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,padding:24}}>
-      <img src={monkeySos} alt="SOS" style={{width:100,height:100,objectFit:"contain",filter:"drop-shadow(0 0 30px rgba(255,59,92,0.5))"}} />
-      <div style={{color:T.t1,fontSize:22,fontWeight:800}}>Co ti teď pomůže?</div>
-      {[{img:monkeyAngry,label:"Motivační řeč",sub:"Goggins, Jocko, Les Brown…",color:T.accent},{img:monkeyMusic,label:"Těžká hudba",sub:"Nech vztek ven",color:T.red},{img:monkeyZen,label:"Dýchání",sub:"Box breathing",color:T.teal}].map((o,i)=>
-        <button key={i} className="reason-card" style={{display:"flex",alignItems:"center",gap:14,padding:"16px 20px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16,width:"100%",maxWidth:340,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+  const [screen, setScreen] = useState<"menu"|"speech"|"breathe"|"music">("menu");
+  const [sosSpeech, setSosSpeech] = useState<typeof SOS_SPEECHES[0]|null>(null);
+  const [musicGenre, setMusicGenre] = useState<typeof SOS_MUSIC_GENRES[0]|null>(null);
+  const [musicLoading, setMusicLoading] = useState(false);
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const musicAudioRef = useRef<HTMLAudioElement|null>(null);
+
+  const pickRandomSpeech = () => {
+    const s = SOS_SPEECHES[Math.floor(Math.random() * SOS_SPEECHES.length)];
+    setSosSpeech(s);
+    setScreen("speech");
+  };
+
+  const playMusic = async (genre: typeof SOS_MUSIC_GENRES[0]) => {
+    // Stop current if playing
+    if (musicAudioRef.current) { musicAudioRef.current.pause(); musicAudioRef.current = null; }
+    setMusicGenre(genre);
+    setMusicLoading(true);
+    setMusicPlaying(false);
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-music`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ prompt: genre.prompt, duration: 30 }),
+      });
+      if (!response.ok) throw new Error("Music failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      musicAudioRef.current = audio;
+      audio.loop = true;
+      audio.onended = () => setMusicPlaying(false);
+      audio.onerror = () => { setMusicPlaying(false); setMusicLoading(false); };
+      await audio.play();
+      setMusicPlaying(true);
+    } catch {
+      // Silent fail
+    }
+    setMusicLoading(false);
+  };
+
+  const stopMusic = () => {
+    if (musicAudioRef.current) { musicAudioRef.current.pause(); musicAudioRef.current = null; }
+    setMusicPlaying(false);
+  };
+
+  const nextGenre = () => {
+    if (!musicGenre) return;
+    const idx = SOS_MUSIC_GENRES.findIndex(g => g.id === musicGenre.id);
+    const next = SOS_MUSIC_GENRES[(idx + 1) % SOS_MUSIC_GENRES.length];
+    playMusic(next);
+  };
+
+  useEffect(() => {
+    return () => { if (musicAudioRef.current) { musicAudioRef.current.pause(); } };
+  }, []);
+
+  const overlay: React.CSSProperties = {position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",overflowY:"auto",padding:"24px 16px",gap:16};
+  const backBtn = (target: "menu"|null) => (
+    <button onClick={()=> target ? setScreen(target) : onClose()} style={{alignSelf:"flex-start",padding:"8px 16px",background:"none",border:`1px solid ${T.t3}`,borderRadius:99,color:T.t2,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:4}}>← Zpět</button>
+  );
+
+  // ── MENU ──
+  if (screen === "menu") return (
+    <div style={overlay} className="anim-fadeIn">
+      <img src={monkeySos} alt="SOS" style={{width:90,height:90,objectFit:"contain",filter:"drop-shadow(0 0 30px rgba(255,59,92,0.5))",marginTop:20}} className="anim-float" />
+      <div style={{color:T.t1,fontSize:24,fontWeight:900,textAlign:"center"}}>Co ti teď pomůže?</div>
+      <div style={{color:T.t2,fontSize:13,textAlign:"center",marginBottom:8}}>Vyber si — opice je tu pro tebe</div>
+      {[
+        {img:monkeyAngry,label:"Motivační řeč",sub:"Náhodná krizová řeč od opice",color:T.accent,action:pickRandomSpeech},
+        {img:monkeyZen,label:"Box Breathing",sub:"4-4-4-4 dýchání na uklidnění",color:T.teal,action:()=>setScreen("breathe")},
+        {img:monkeyMusic,label:"Hudba",sub:"Metal, klid, smutek, energie…",color:T.purple,action:()=>setScreen("music")},
+      ].map((o,i)=>
+        <button key={i} onClick={o.action} className="reason-card" style={{display:"flex",alignItems:"center",gap:14,padding:"16px 20px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16,width:"100%",maxWidth:360,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
           <img src={o.img} alt={o.label} style={{width:50,height:50,objectFit:"contain",borderRadius:14}} loading="lazy" />
           <div><div style={{color:T.t1,fontSize:16,fontWeight:700}}>{o.label}</div><div style={{color:T.t2,fontSize:12}}>{o.sub}</div></div>
         </button>
       )}
-      <a href="tel:116111" style={{display:"flex",alignItems:"center",gap:12,padding:"14px 20px",background:T.redDim,border:`1px solid ${T.red}40`,borderRadius:16,width:"100%",maxWidth:340,textDecoration:"none"}}>
+      <a href="tel:116111" style={{display:"flex",alignItems:"center",gap:12,padding:"14px 20px",background:T.redDim,border:`1px solid ${T.red}40`,borderRadius:16,width:"100%",maxWidth:360,textDecoration:"none"}}>
         <span style={{fontSize:24}}>📞</span>
         <div><div style={{color:T.red,fontSize:22,fontWeight:900}}>116 111</div><div style={{color:T.t2,fontSize:12}}>Linka bezpečí — nonstop, zdarma</div></div>
       </a>
       <button onClick={onClose} style={{padding:"10px 28px",background:"none",border:`1px solid ${T.t3}`,borderRadius:99,color:T.t2,fontSize:14,cursor:"pointer",fontFamily:"inherit",marginTop:8}}>✕ Zavřít</button>
     </div>
   );
+
+  // ── SPEECH ──
+  if (screen === "speech" && sosSpeech) return (
+    <div style={overlay} className="anim-fadeIn">
+      {backBtn("menu")}
+      <div style={{fontSize:60,marginTop:16}} className="anim-bounce">{sosSpeech.icon}</div>
+      <div style={{color:T.t1,fontSize:22,fontWeight:900,textAlign:"center"}}>{sosSpeech.title}</div>
+      <div style={{color:T.t2,fontSize:12,marginBottom:8}}>{sosSpeech.src}</div>
+      <div style={{background:T.card,border:`1px solid ${sosSpeech.color}30`,borderRadius:16,padding:20,maxWidth:380,width:"100%",lineHeight:1.7}}>
+        <div style={{color:T.t1,fontSize:15}}>{sosSpeech.text}</div>
+      </div>
+      <SpeechPlayer text={sosSpeech.text} label="Přehraj řeč" speechId={sosSpeech.id} emotion="all" />
+      <button onClick={pickRandomSpeech} style={{padding:"12px 28px",background:T.accentDim,border:`1px solid ${T.accent}40`,borderRadius:99,color:T.accent,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginTop:4}}>🔀 Další řeč</button>
+    </div>
+  );
+
+  // ── BREATHE ──
+  if (screen === "breathe") return (
+    <div style={overlay} className="anim-fadeIn">
+      {backBtn("menu")}
+      <div style={{marginTop:20,width:"100%",maxWidth:380}}>
+        <BreathingExercise type="box" />
+      </div>
+    </div>
+  );
+
+  // ── MUSIC ──
+  if (screen === "music") return (
+    <div style={overlay} className="anim-fadeIn">
+      {backBtn("menu")}
+      <img src={monkeyMusic} alt="Music" style={{width:70,height:70,objectFit:"contain",marginTop:8}} className={musicPlaying ? "anim-monkeyBob" : ""} />
+      <div style={{color:T.t1,fontSize:20,fontWeight:800,textAlign:"center"}}>Jakou hudbu potřebuješ?</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,width:"100%",maxWidth:380}}>
+        {SOS_MUSIC_GENRES.map(g => (
+          <button key={g.id} onClick={() => playMusic(g)} disabled={musicLoading}
+            className="reason-card"
+            style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"16px 12px",background: musicGenre?.id === g.id ? `${g.color}20` : T.card,border:`1px solid ${musicGenre?.id === g.id ? g.color : T.border}`,borderRadius:14,cursor:musicLoading?"wait":"pointer",fontFamily:"inherit",textAlign:"center"}}>
+            <div style={{fontSize:28}}>{g.label.split(" ")[0]}</div>
+            <div style={{color:T.t1,fontSize:14,fontWeight:700}}>{g.label.split(" ").slice(1).join(" ")}</div>
+            <div style={{color:T.t2,fontSize:11}}>{g.sub}</div>
+          </button>
+        ))}
+      </div>
+      {musicLoading && (
+        <div style={{color:T.accent,fontSize:14,fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
+          <span style={{animation:"pulse 1.5s infinite"}}>⏳</span> Generuji hudbu…
+        </div>
+      )}
+      {musicPlaying && musicGenre && (
+        <div style={{display:"flex",gap:10,marginTop:4}}>
+          <button onClick={stopMusic} style={{padding:"10px 24px",background:T.redDim,border:`1px solid ${T.red}40`,borderRadius:99,color:T.red,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>■ Stop</button>
+          <button onClick={nextGenre} style={{padding:"10px 24px",background:T.accentDim,border:`1px solid ${T.accent}40`,borderRadius:99,color:T.accent,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>🔀 Další žánr</button>
+        </div>
+      )}
+    </div>
+  );
+
+  return null;
 }
 
 // ══════════════════════════════
