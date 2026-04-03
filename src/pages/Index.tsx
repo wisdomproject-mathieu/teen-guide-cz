@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useCloudData } from "@/hooks/useCloudData";
+import { useAuth } from "@/hooks/useAuth";
 import monkeyHero from "@/assets/monkey-hero.png";
 import monkeySad from "@/assets/monkey-sad.png";
 import monkeyAngry from "@/assets/monkey-angry.png";
@@ -463,7 +465,7 @@ function MonkeyChat() {
 }
 
 // ── PROFILE TAB (with Mood Insights) ──
-function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void}) {
+function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void}) {
   const [activeSection, setActiveSection] = useState("overview");
   const [contacts, setContacts] = useState([{name:"",phone:""}]);
   const [diary, setDiary] = useState("");
@@ -690,6 +692,11 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
           {moodLog.length === 0 && <div style={{color:T.t3,fontSize:13,textAlign:"center",padding:20}}>Zatím žádné záznamy 🐵</div>}
         </div>
       )}
+
+      {/* Sign out button */}
+      <button onClick={onSignOut} style={{marginTop:24,padding:"12px 0",width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,color:T.red,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+        Odhlásit se
+      </button>
     </div>
   );
 }
@@ -979,15 +986,13 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
 // ── MAIN APP ──
 // ══════════════════════════════
 export default function Index() {
+  const { signOut } = useAuth();
+  const cloud = useCloudData();
+  const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName } = cloud;
+
   const [tab, setTab] = useState("feel");
   const [showSOS, setShowSOS] = useState(false);
-  const [moodLog, setMoodLog] = useState<any[]>([]);
-  const [streakCount, setStreakCount] = useState(0);
-  const [xp, setXp] = useState(() => Number(localStorage.getItem("mm_xp") || "0"));
-  const [completedQuests, setCompletedQuests] = useState<string[]>(() => JSON.parse(localStorage.getItem("mm_quests") || "[]"));
-  const [equippedSkin, setEquippedSkin] = useState(() => localStorage.getItem("mm_skin") || "default");
-  const [userName, setUserName] = useState(() => localStorage.getItem("mm_name") || "");
-  const [avatar, setAvatar] = useState<string|null>(() => localStorage.getItem("mm_avatar"));
+  const [avatar, setAvatar] = useState<string|null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [xpPopup, setXpPopup] = useState<{xp:number;label:string}|null>(null);
   const [levelUp, setLevelUp] = useState<{level:number;skin?:typeof MONKEY_SKINS[0]|null}|null>(null);
@@ -996,10 +1001,10 @@ export default function Index() {
   const [selectedReason, setSelectedReason] = useState<any>(null);
   const [recs, setRecs] = useState<any>(null);
 
-  const handleNameChange = (n: string) => { setUserName(n); localStorage.setItem("mm_name", n); };
+  const handleNameChange = (n: string) => { cloud.updateName(n); };
   const handleAvatar = (e: any) => {
     const f = e.target.files?.[0];
-    if (f) { const r = new FileReader(); r.onload = (ev: any) => { setAvatar(ev.target.result); localStorage.setItem("mm_avatar", ev.target.result); }; r.readAsDataURL(f); }
+    if (f) { const r = new FileReader(); r.onload = (ev: any) => { setAvatar(ev.target.result); }; r.readAsDataURL(f); }
   };
 
   const completeQuest = (questId: string) => {
@@ -1008,23 +1013,18 @@ export default function Index() {
     const quest = DAILY_QUESTS.find(q => q.id === questId);
     if (!quest) return;
     const newQ = [...completedQuests, key];
-    setCompletedQuests(newQ);
-    localStorage.setItem("mm_quests", JSON.stringify(newQ));
     const oldLevel = Math.floor(xp / 100) + 1;
     const newXp = xp + quest.xp;
     const newLevel = Math.floor(newXp / 100) + 1;
-    setXp(newXp);
-    localStorage.setItem("mm_xp", String(newXp));
-    // XP popup
+    cloud.updateProgress(newXp, streakCount, newQ);
     setXpPopup({ xp: quest.xp, label: quest.label });
-    // Level up check
     if (newLevel > oldLevel) {
       const newSkin = MONKEY_SKINS.find(s => s.xpNeeded <= newXp && s.xpNeeded > xp) || null;
       setTimeout(() => setLevelUp({ level: newLevel, skin: newSkin }), 1200);
     }
   };
   const equipSkin = (id: string) => {
-    setEquippedSkin(id); localStorage.setItem("mm_skin", id);
+    cloud.updateSkin(id);
     const skin = MONKEY_SKINS.find(s => s.id === id);
     if (skin) setXpPopup({ xp: 0, label: `${skin.name} nasazen!` });
   };
@@ -1033,13 +1033,14 @@ export default function Index() {
   const selectMood = (m: any) => { setSelectedMood(m); setStep(2); };
   const selectReason = (r: any) => {
     setSelectedReason(r);
-    setMoodLog(p => [{ mood: selectedMood, reason: r, ts: new Date().toLocaleString("cs-CZ"), id: Date.now() }, ...p.slice(0, 99)]);
-    setStreakCount(p => p + 1);
+    cloud.logMood(selectedMood.id, r.id);
+    const newStreak = streakCount + 1;
+    cloud.updateProgress(xp, newStreak, completedQuests);
     setRecs(getRecommendations(selectedMood, r));
     setStep(3);
     completeQuest("checkin");
-    if (streakCount + 1 >= 3) completeQuest("streak3");
-    if (streakCount + 1 >= 7) completeQuest("streak7");
+    if (newStreak >= 3) completeQuest("streak3");
+    if (newStreak >= 7) completeQuest("streak7");
   };
   const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); };
 
@@ -1287,7 +1288,7 @@ export default function Index() {
 
         {/* ════════ PROFILE TAB ════════ */}
         {tab === "profile" && (
-          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} />
+          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} />
         )}
       </div>
 
