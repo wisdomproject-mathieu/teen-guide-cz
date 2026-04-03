@@ -722,11 +722,8 @@ export default function Index() {
           </div>
         )}
 
-        {/* ════════ CHAT TAB ════════ */}
-        {tab === "chat" && <MonkeyChat />}
-
-        {/* ════════ PROFILE TAB ════════ */}
-        {tab === "profile" && (
+        {/* ════════ QUESTS TAB ════════ */}
+        {tab === "quests" && <QuestsTab xp={xp} completedQuests={completedQuests} onEquipSkin={equipSkin} equippedSkin={equippedSkin} />}
           <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} />
         )}
       </div>
