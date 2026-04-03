@@ -867,6 +867,7 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
 
   const stopMusic = () => {
     if (musicAudioRef.current) { musicAudioRef.current.pause(); musicAudioRef.current = null; }
+    stopWebAudio();
     setMusicPlaying(false);
   };
 
