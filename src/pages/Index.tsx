@@ -396,10 +396,10 @@ export default function Index() {
           <div>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 0"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <span style={{fontSize:28}}>🐵</span>
+                <img src={monkeyHero} alt="Monkey Mind" style={{width:44,height:44,objectFit:"contain"}} />
                 <div>
                   <div style={{color:T.accent,fontSize:11,fontWeight:800,letterSpacing:2}}>MONKEY MIND</div>
-                  <div style={{color:T.t1,fontSize:15,fontWeight:600}}>Ahoj! 🐵</div>
+                  <div style={{color:T.t1,fontSize:15,fontWeight:600}}>Yo, co je? 🤙</div>
                 </div>
               </div>
               <button onClick={()=>setShowProfile(true)} style={{width:40,height:40,borderRadius:"50%",background:T.card,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative"}}>
