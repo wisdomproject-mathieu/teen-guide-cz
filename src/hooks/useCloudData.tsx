@@ -11,6 +11,7 @@ export function useCloudData() {
   const [completedQuests, setCompletedQuests] = useState<string[]>([]);
   const [equippedSkin, setEquippedSkin] = useState("default");
   const [userName, setUserName] = useState("");
+  const [lastCheckinDate, setLastCheckinDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Load all data on mount
