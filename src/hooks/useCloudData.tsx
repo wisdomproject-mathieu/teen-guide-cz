@@ -101,7 +101,7 @@ export function useCloudData() {
 
   return {
     loading, moodLog, xp, streakCount, completedQuests,
-    equippedSkin, userName, profile,
+    equippedSkin, userName, profile, lastCheckinDate,
     updateName, updateSkin, logMood, updateProgress,
     setMoodLog, setXp, setStreakCount, setCompletedQuests,
   };
