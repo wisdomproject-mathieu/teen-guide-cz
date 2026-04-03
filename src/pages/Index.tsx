@@ -608,9 +608,9 @@ export default function Index() {
                 <div style={{color:T.t2,fontSize:13,marginTop:2}}>Věci co ti ve škole neřeknou</div>
               </div>
             </div>
-            {[{icon:"♂♀",title:"Rozuměj klukům a holkám",sub:"Mars/Venus, komunikace, energie",color:T.purple},{icon:"⚔",title:"Staň se válečníkem",sub:"Goggins, Jocko, Stoici, disciplína",color:T.red},{icon:"🛡",title:"Nenech se zničit",sub:"NVC, hranice, šikana, CBT",color:T.teal},{icon:"📱",title:"Tvůj mozek vs. telefon",sub:"Haidt, dopamin, spánek, pozornost",color:T.accent},{icon:"🪞",title:"Kdo jsi?",sub:"Identita, Frankl, Jung, puberta",color:T.blue}].map((g,i)=>
+            {[{img:monkeyGender,title:"Rozuměj klukům a holkám",sub:"Mars/Venus, komunikace, energie",color:T.purple},{img:monkeyWarrior,title:"Staň se válečníkem",sub:"Goggins, Jocko, Stoici, disciplína",color:T.red},{img:monkeyShield,title:"Nenech se zničit",sub:"NVC, hranice, šikana, CBT",color:T.teal},{img:monkeySocial,title:"Tvůj mozek vs. telefon",sub:"Haidt, dopamin, spánek, pozornost",color:T.accent},{img:monkeyIdentity,title:"Kdo jsi?",sub:"Identita, Frankl, Jung, puberta",color:T.blue}].map((g,i)=>
               <div key={i} className={`card-hover anim-slideIn anim-d${i+1}`} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:`linear-gradient(135deg, ${g.color}08, transparent)`,border:`1px solid ${g.color}15`,borderRadius:16,marginBottom:10,cursor:"pointer"}}>
-                <div style={{fontSize:26,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:`${g.color}15`,borderRadius:12}}>{g.icon}</div>
+                <img src={g.img} alt={g.title} style={{width:44,height:44,objectFit:"contain",borderRadius:12}} loading="lazy" />
                 <div style={{flex:1}}><div style={{color:T.t1,fontSize:15,fontWeight:700}}>{g.title}</div><div style={{color:T.t2,fontSize:12,marginTop:2}}>{g.sub}</div></div>
                 <div style={{color:`${g.color}60`,fontSize:16}}>→</div>
               </div>
