@@ -7,17 +7,22 @@ import monkeyAnxious from "@/assets/monkey-anxious.png";
 import monkeySos from "@/assets/monkey-sos.png";
 import monkeyLearn from "@/assets/monkey-learn.png";
 import monkeyTrain from "@/assets/monkey-train.png";
+import monkeyGreat from "@/assets/monkey-great.png";
+import monkeyOk from "@/assets/monkey-ok.png";
+import monkeyMeh from "@/assets/monkey-meh.png";
+import monkeyBad from "@/assets/monkey-bad.png";
+import monkeyAwful from "@/assets/monkey-awful.png";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Mood-to-monkey mapping
 const MOOD_MONKEY: Record<string, string> = {
-  great: monkeyHero,
-  ok: monkeyHero,
-  meh: monkeyAnxious,
-  bad: monkeySad,
-  awful: monkeySad,
+  great: monkeyGreat,
+  ok: monkeyOk,
+  meh: monkeyMeh,
+  bad: monkeyBad,
+  awful: monkeyAwful,
 };
 const EMO_MONKEY: Record<string, string> = {
   anger: monkeyAngry,
