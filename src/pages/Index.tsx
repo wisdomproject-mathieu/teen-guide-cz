@@ -1063,7 +1063,15 @@ export default function Index() {
 
   const lastMoodMonkey = selectedMood ? MOOD_MONKEY[selectedMood.id] : (moodLog.length > 0 ? MOOD_MONKEY[moodLog[0].mood.id] : null);
 
+  if (cloudLoading) return (
+    <div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0A0C13"}}>
+      <img src={monkeyHero} alt="" style={{width:80,height:80,objectFit:"contain",animation:"float 2s ease-in-out infinite"}} />
+    </div>
+  );
+
   return (
+    <>
+    {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
     <div style={{maxWidth:430,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",background:T.bg,fontFamily:"'Segoe UI',system-ui,sans-serif",color:T.t1,overflow:"hidden"}}>
       <style>{`
         @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
