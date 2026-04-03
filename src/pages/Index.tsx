@@ -466,6 +466,147 @@ function MonkeyChat() {
   );
 }
 
+// ── MOOD INSIGHTS CHARTS (recharts) ──
+function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
+  const [range, setRange] = useState<"week" | "month">("week");
+  const moodScore: Record<string, number> = { great: 5, pumped: 4, meh: 3, angry: 2, sad: 2, anxious: 1, awful: 0 };
+  const moodColors: Record<string, string> = { great: T.teal, pumped: T.blue, meh: T.accent, angry: T.red, sad: T.purple, anxious: "#FF7A2F", awful: T.red };
+
+  // Build daily trend data
+  const daysBack = range === "week" ? 7 : 30;
+  const trendData = [];
+  for (let d = daysBack - 1; d >= 0; d--) {
+    const date = new Date();
+    date.setDate(date.getDate() - d);
+    const ds = date.toLocaleDateString("cs-CZ");
+    const dayLogs = moodLog.filter((l: any) => l.ts.startsWith(ds));
+    const avg = dayLogs.length > 0
+      ? dayLogs.reduce((s: number, l: any) => s + (moodScore[l.mood.id] ?? 3), 0) / dayLogs.length
+      : null;
+    const label = range === "week"
+      ? ["Ne","Po","Út","St","Čt","Pá","So"][date.getDay()]
+      : `${date.getDate()}.${date.getMonth()+1}`;
+    trendData.push({ name: label, score: avg, count: dayLogs.length });
+  }
+
+  // Mood distribution pie data
+  const counts: Record<string, number> = {};
+  const filteredLogs = range === "week"
+    ? moodLog.filter(l => { const d = new Date(); d.setDate(d.getDate() - 7); return new Date(l.ts.replace(/(\d+)\.\s*(\d+)\.\s*(\d+)/, '$3-$2-$1')) >= d || true; })
+    : moodLog;
+  filteredLogs.forEach((l: any) => { counts[l.mood.id] = (counts[l.mood.id] || 0) + 1; });
+  const pieData = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([id, value]) => ({
+      name: MOODS.find(m => m.id === id)?.label || id,
+      value,
+      fill: moodColors[id] || T.accent,
+    }));
+
+  // Top reasons
+  const reasonCounts: Record<string, number> = {};
+  filteredLogs.forEach((l: any) => { if (l.reason) reasonCounts[l.reason.id] = (reasonCounts[l.reason.id] || 0) + 1; });
+  const topReasons = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    .map(([id, value]) => ({ name: REASONS.find(r => r.id === id)?.label || id, value, fill: T.accent }));
+
+  // AI insight
+  const topMoodEntry = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  const topMood = MOODS.find(m => m.id === topMoodEntry?.[0]);
+  const topReasonEntry = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])[0];
+  const topReason = REASONS.find(r => r.id === topReasonEntry?.[0]);
+
+  return (
+    <>
+      {/* Range toggle */}
+      <div style={{display:"flex",gap:6,marginBottom:16}}>
+        {(["week","month"] as const).map(r => (
+          <button key={r} onClick={() => setRange(r)} className="reason-card"
+            style={{padding:"6px 14px",background:range===r?T.accentDim:T.card,border:`1px solid ${range===r?T.accent:T.border}`,borderRadius:99,color:range===r?T.accent:T.t2,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+            {r === "week" ? "📅 Týden" : "📆 Měsíc"}
+          </button>
+        ))}
+      </div>
+
+      {/* Mood Trend Line Chart */}
+      <div style={{marginBottom:20,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:"16px 8px 8px"}}>
+        <div style={{color:T.t1,fontSize:14,fontWeight:700,marginBottom:12,paddingLeft:8}}>Trend nálady</div>
+        <ResponsiveContainer width="100%" height={180}>
+          <AreaChart data={trendData}>
+            <defs>
+              <linearGradient id="moodGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={T.accent} stopOpacity={0.4}/>
+                <stop offset="95%" stopColor={T.accent} stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <XAxis dataKey="name" tick={{fill:T.t3,fontSize:10}} axisLine={false} tickLine={false} />
+            <YAxis domain={[0,5]} tick={{fill:T.t3,fontSize:10}} axisLine={false} tickLine={false} width={20}
+              tickFormatter={(v: number) => ["💀","😰","😢","😐","💪","🔥"][v] || ""} />
+            <Tooltip
+              contentStyle={{background:"#1a1d2e",border:`1px solid ${T.border}`,borderRadius:12,fontSize:12,color:T.t1}}
+              formatter={(v: any) => [v !== null ? `${Number(v).toFixed(1)} / 5` : "—", "Skóre"]}
+              labelStyle={{color:T.t2}}
+            />
+            <Area type="monotone" dataKey="score" stroke={T.accent} strokeWidth={2.5} fill="url(#moodGrad)" dot={{r:3,fill:T.accent,stroke:"none"}} connectNulls={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Mood Distribution Bar Chart */}
+      <div style={{marginBottom:20,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:"16px 8px 8px"}}>
+        <div style={{color:T.t1,fontSize:14,fontWeight:700,marginBottom:12,paddingLeft:8}}>Rozložení nálad</div>
+        <ResponsiveContainer width="100%" height={pieData.length * 36 + 16}>
+          <BarChart data={pieData} layout="vertical" barCategoryGap={6}>
+            <XAxis type="number" hide />
+            <YAxis dataKey="name" type="category" tick={{fill:T.t2,fontSize:12,fontWeight:600}} axisLine={false} tickLine={false} width={75} />
+            <Tooltip
+              contentStyle={{background:"#1a1d2e",border:`1px solid ${T.border}`,borderRadius:12,fontSize:12,color:T.t1}}
+              formatter={(v: any) => [`${v}×`, "Check-iny"]}
+              labelStyle={{color:T.t2}}
+            />
+            <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={20}>
+              {pieData.map((entry, index) => (
+                <Cell key={index} fill={entry.fill} fillOpacity={0.8} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Top Reasons */}
+      {topReasons.length > 0 && (
+        <div style={{marginBottom:20,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:"16px 8px 8px"}}>
+          <div style={{color:T.t1,fontSize:14,fontWeight:700,marginBottom:12,paddingLeft:8}}>Nejčastější důvody</div>
+          <ResponsiveContainer width="100%" height={topReasons.length * 36 + 16}>
+            <BarChart data={topReasons} layout="vertical" barCategoryGap={6}>
+              <XAxis type="number" hide />
+              <YAxis dataKey="name" type="category" tick={{fill:T.t2,fontSize:12,fontWeight:600}} axisLine={false} tickLine={false} width={80} />
+              <Tooltip
+                contentStyle={{background:"#1a1d2e",border:`1px solid ${T.border}`,borderRadius:12,fontSize:12,color:T.t1}}
+                formatter={(v: any) => [`${v}×`, "Zmíněno"]}
+                labelStyle={{color:T.t2}}
+              />
+              <Bar dataKey="value" radius={[0, 8, 8, 0]} fill={T.teal} fillOpacity={0.8} barSize={20} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* AI insight summary */}
+      <div style={{background:`linear-gradient(135deg, ${T.accent}10, ${T.purple}08)`,border:`1px solid ${T.accent}20`,borderRadius:16,padding:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+          <span style={{fontSize:18}}>💡</span>
+          <span style={{color:T.t1,fontSize:14,fontWeight:700}}>Opičí analýza</span>
+        </div>
+        <div style={{color:T.t2,fontSize:13,lineHeight:1.6}}>
+          Tvoje nejčastější nálada je <span style={{color:topMood?.color||T.accent,fontWeight:700}}>{topMood?.label || "?"}</span>
+          {topReason && <>, hlavně kvůli <span style={{color:T.accent,fontWeight:700}}>{topReason.label.toLowerCase()}</span></>}.
+          {topMoodEntry && Number(topMoodEntry[1]) >= 3 && <> Zkus se zaměřit na to, co ti pomáhá v těchto momentech. 🐵</>}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── PROFILE TAB (with Mood Insights) ──
 function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void}) {
   const [activeSection, setActiveSection] = useState("overview");
