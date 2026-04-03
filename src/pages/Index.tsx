@@ -883,7 +883,12 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
       </div>
       {musicLoading && (
         <div style={{color:T.accent,fontSize:14,fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
-          <span style={{animation:"pulse 1.5s infinite"}}>⏳</span> Generuji hudbu…
+          <span style={{animation:"pulse 1.5s infinite"}}>⏳</span> Generuji hudbu… (může trvat ~15s)
+        </div>
+      )}
+      {musicError && !musicLoading && (
+        <div style={{color:T.red,fontSize:13,fontWeight:600,textAlign:"center",padding:"8px 16px",background:T.redDim,borderRadius:10,maxWidth:340}}>
+          ⚠️ {musicError}
         </div>
       )}
       {musicPlaying && musicGenre && (
