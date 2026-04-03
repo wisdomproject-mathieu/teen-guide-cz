@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useCloudData } from "@/hooks/useCloudData";
+import Onboarding from "@/components/Onboarding";
 import { useAuth } from "@/hooks/useAuth";
 import monkeyHero from "@/assets/monkey-hero.png";
 import monkeySad from "@/assets/monkey-sad.png";
