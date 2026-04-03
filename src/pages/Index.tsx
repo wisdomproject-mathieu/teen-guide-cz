@@ -997,6 +997,9 @@ export default function Index() {
           </div>
         )}
 
+        {/* ════════ CHAT TAB ════════ */}
+        {tab === "chat" && <MonkeyChat />}
+
         {/* ════════ QUESTS TAB ════════ */}
         {tab === "quests" && <QuestsTab xp={xp} completedQuests={completedQuests} onEquipSkin={equipSkin} equippedSkin={equippedSkin} />}
 
