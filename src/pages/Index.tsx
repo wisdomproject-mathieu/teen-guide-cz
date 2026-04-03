@@ -458,8 +458,7 @@ export default function Index() {
               <>
                 <button onClick={resetFlow} style={{background:"none",border:"none",color:T.accent,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12}}>← Nový check-in</button>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:T.card,borderRadius:14,border:`1px solid ${T.border}`}}>
-                  <span style={{fontSize:20}}>{selectedMood.emoji}</span>
-                  <span style={{fontSize:20}}>{selectedReason.icon}</span>
+                  <img src={EMO_MONKEY[recs.emo] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
                   <div>
                     <div style={{color:T.t1,fontSize:14,fontWeight:700}}>{selectedMood.label} · {selectedReason.label}</div>
                     <div style={{color:T.t2,fontSize:12}}>Opice ti vybrala tohle 👇</div>
