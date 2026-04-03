@@ -539,7 +539,7 @@ export default function Index() {
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
                     {recs.speeches.map((s: any) => (
-                      <div key={s.id} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
+                      <div key={s.id} className="speech-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                           <span style={{fontSize:22}}>{s.icon}</span>
                           <div>
