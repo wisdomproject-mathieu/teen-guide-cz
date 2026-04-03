@@ -724,6 +724,9 @@ export default function Index() {
 
         {/* ════════ QUESTS TAB ════════ */}
         {tab === "quests" && <QuestsTab xp={xp} completedQuests={completedQuests} onEquipSkin={equipSkin} equippedSkin={equippedSkin} />}
+
+        {/* ════════ PROFILE TAB ════════ */}
+        {tab === "profile" && (
           <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} />
         )}
       </div>
