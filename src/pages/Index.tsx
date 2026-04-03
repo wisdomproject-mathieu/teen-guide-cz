@@ -417,22 +417,34 @@ export default function Index() {
         @keyframes bounceIn{0%{opacity:0;transform:scale(0.6)}60%{transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}
         @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
         @keyframes glowPulse{0%,100%{box-shadow:0 0 8px rgba(255,122,47,0.2)}50%{box-shadow:0 0 20px rgba(255,122,47,0.4)}}
+        @keyframes neonFlicker{0%,100%{opacity:1}50%{opacity:0.85}}
         .anim-fadeUp{animation:fadeUp .4s ease-out both}
         .anim-fadeIn{animation:fadeIn .3s ease-out both}
         .anim-slideIn{animation:slideInRight .4s ease-out both}
         .anim-bounce{animation:bounceIn .5s cubic-bezier(.36,1.1,.3,1) both}
         .anim-float{animation:float 3s ease-in-out infinite}
         .anim-d1{animation-delay:.05s}.anim-d2{animation-delay:.1s}.anim-d3{animation-delay:.15s}.anim-d4{animation-delay:.2s}.anim-d5{animation-delay:.25s}
-        .mood-btn{transition:all .2s ease;position:relative;overflow:hidden}
-        .mood-btn:hover{transform:scale(1.02);filter:brightness(1.15)}
+        .mood-btn{transition:all .25s ease;position:relative;overflow:hidden}
+        .mood-btn:hover{transform:scale(1.02);filter:brightness(1.15);box-shadow:0 0 18px rgba(255,122,47,0.25),inset 0 0 12px rgba(255,122,47,0.06)}
         .mood-btn:active{transform:scale(0.97)}
-        .card-hover{transition:all .2s ease}
-        .card-hover:hover{transform:translateY(-2px);border-color:rgba(255,122,47,0.3)!important}
+        .card-hover{transition:all .25s cubic-bezier(.4,0,.2,1)}
+        .card-hover:hover{transform:translateY(-3px);box-shadow:0 0 16px rgba(255,122,47,0.2),0 4px 20px rgba(0,0,0,0.3);border-color:rgba(255,122,47,0.35)!important}
         .card-hover:active{transform:scale(0.98)}
+        .reason-card{transition:all .25s cubic-bezier(.4,0,.2,1);position:relative}
+        .reason-card::after{content:'';position:absolute;inset:-1px;border-radius:15px;background:linear-gradient(135deg,transparent,rgba(255,122,47,0.15),transparent);opacity:0;transition:opacity .3s ease;pointer-events:none;z-index:0}
+        .reason-card:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 0 14px rgba(255,122,47,0.2),0 0 30px rgba(255,122,47,0.08);border-color:rgba(255,122,47,0.4)!important}
+        .reason-card:hover::after{opacity:1}
+        .reason-card:hover img{transform:scale(1.1);filter:drop-shadow(0 0 6px rgba(255,122,47,0.4))}
+        .reason-card img{transition:all .25s ease}
+        .reason-card:active{transform:scale(0.96)}
+        .speech-card{transition:all .25s ease;position:relative;overflow:hidden}
+        .speech-card::before{content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.03),transparent);transition:left .5s ease}
+        .speech-card:hover{border-color:rgba(255,122,47,0.25)!important;box-shadow:0 0 20px rgba(255,122,47,0.1)}
+        .speech-card:hover::before{left:100%}
         .nav-btn{transition:all .2s ease}
-        .nav-btn:hover{transform:scale(1.1)}
+        .nav-btn:hover{transform:scale(1.1);filter:drop-shadow(0 0 6px rgba(255,122,47,0.3))}
         .tab-monkey{transition:all .3s ease}
-        .tab-monkey:hover{transform:scale(1.05) rotate(-3deg)}
+        .tab-monkey:hover{transform:scale(1.05) rotate(-3deg);filter:drop-shadow(0 0 10px rgba(255,122,47,0.3))}
         *{box-sizing:border-box;margin:0;padding:0}
         ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:${T.t3};border-radius:4px}
         input::placeholder,textarea::placeholder{color:${T.t3}}
@@ -495,7 +507,7 @@ export default function Index() {
                 <div style={{color:T.t2,fontSize:12,marginBottom:16}}>Vyber co je nejblíž — opice najde co ti pomůže</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                   {REASONS.map(r => (
-                    <button key={r.id} onClick={()=>selectReason(r)} className="card-hover" style={{display:"flex",alignItems:"center",gap:10,padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
+                    <button key={r.id} onClick={()=>selectReason(r)} className="reason-card" style={{display:"flex",alignItems:"center",gap:10,padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
                       <img src={REASON_MONKEY[r.id]} alt={r.label} style={{width:40,height:40,objectFit:"contain",borderRadius:8}} loading="lazy" />
                       <div style={{flex:1}}>
                         <div style={{color:T.t1,fontSize:13,fontWeight:700}}>{r.label}</div>
@@ -527,7 +539,7 @@ export default function Index() {
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
                     {recs.speeches.map((s: any) => (
-                      <div key={s.id} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
+                      <div key={s.id} className="speech-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                           <span style={{fontSize:22}}>{s.icon}</span>
                           <div>
