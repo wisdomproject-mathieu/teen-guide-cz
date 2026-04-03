@@ -548,8 +548,13 @@ export default function Index() {
         {/* ════════ LEARN TAB ════════ */}
         {tab === "learn" && (
           <div style={{paddingTop:20}}>
-            <div style={{color:T.t1,fontSize:22,fontWeight:900,marginBottom:4}}>Pochop to</div>
-            <div style={{color:T.t2,fontSize:13,marginBottom:20}}>Věci co ti ve škole neřeknou</div>
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
+              <img src={monkeyLearn} alt="" style={{width:64,height:64,objectFit:"contain"}} loading="lazy" />
+              <div>
+                <div style={{color:T.t1,fontSize:22,fontWeight:900}}>Pochop to</div>
+                <div style={{color:T.t2,fontSize:13}}>Věci co ti ve škole neřeknou</div>
+              </div>
+            </div>
             {[{icon:"♂♀",title:"Rozuměj klukům a holkám",sub:"Mars/Venus, komunikace, energie",color:T.purple},{icon:"⚔",title:"Staň se válečníkem",sub:"Goggins, Jocko, Stoici, disciplína",color:T.red},{icon:"🛡",title:"Nenech se zničit",sub:"NVC, hranice, šikana, CBT",color:T.teal},{icon:"📱",title:"Tvůj mozek vs. telefon",sub:"Haidt, dopamin, spánek, pozornost",color:T.accent},{icon:"🪞",title:"Kdo jsi?",sub:"Identita, Frankl, Jung, puberta",color:T.blue}].map((g,i)=>
               <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,marginBottom:8,cursor:"pointer"}}>
                 <div style={{fontSize:28,width:44,textAlign:"center"}}>{g.icon}</div>
