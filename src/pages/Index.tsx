@@ -1003,6 +1003,21 @@ export default function Index() {
   const [selectedReason, setSelectedReason] = useState<any>(null);
   const [recs, setRecs] = useState<any>(null);
 
+  // Show onboarding for new users (no name set yet)
+  useEffect(() => {
+    if (!cloudLoading && !userName) setShowOnboarding(true);
+  }, [cloudLoading, userName]);
+
+  const handleOnboardingComplete = (newName: string, moodId: string) => {
+    cloud.updateName(newName);
+    const mood = MOODS.find(m => m.id === moodId);
+    if (mood) {
+      setSelectedMood(mood);
+      setStep(2); // go to reason selection
+    }
+    setShowOnboarding(false);
+  };
+
   const handleNameChange = (n: string) => { cloud.updateName(n); };
   const handleAvatar = (e: any) => {
     const f = e.target.files?.[0];
