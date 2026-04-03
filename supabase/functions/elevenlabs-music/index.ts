@@ -21,28 +21,59 @@ serve(async (req) => {
       });
     }
 
-    const response = await fetch("https://api.elevenlabs.io/v1/music", {
-      method: "POST",
-      headers: {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt,
-        duration_seconds: duration || 30,
-      }),
-    });
+    // Try Music API first
+    let audioBuffer: ArrayBuffer | null = null;
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("ElevenLabs music error:", response.status, errText);
-      return new Response(JSON.stringify({ error: "Music generation failed", details: errText }), {
-        status: response.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    try {
+      const musicResponse = await fetch("https://api.elevenlabs.io/v1/music", {
+        method: "POST",
+        headers: {
+          "xi-api-key": ELEVENLABS_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt,
+          duration_seconds: duration || 30,
+        }),
       });
+
+      if (musicResponse.ok) {
+        audioBuffer = await musicResponse.arrayBuffer();
+      } else {
+        const errText = await musicResponse.text();
+        console.log("Music API unavailable, falling back to SFX:", musicResponse.status, errText);
+      }
+    } catch (e) {
+      console.log("Music API error, falling back to SFX:", e.message);
     }
 
-    const audioBuffer = await response.arrayBuffer();
+    // Fallback: Sound Effects API (available on free plans)
+    if (!audioBuffer) {
+      console.log("Using Sound Effects API fallback with prompt:", prompt);
+      const sfxResponse = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
+        method: "POST",
+        headers: {
+          "xi-api-key": ELEVENLABS_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: prompt,
+          duration_seconds: Math.min(duration || 22, 22), // SFX max is 22 seconds
+          prompt_influence: 0.3,
+        }),
+      });
+
+      if (!sfxResponse.ok) {
+        const errText = await sfxResponse.text();
+        console.error("SFX API also failed:", sfxResponse.status, errText);
+        return new Response(JSON.stringify({ error: "Both Music and SFX APIs failed", details: errText }), {
+          status: sfxResponse.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      audioBuffer = await sfxResponse.arrayBuffer();
+    }
 
     return new Response(audioBuffer, {
       headers: {
