@@ -765,8 +765,71 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
     setScreen("speech");
   };
 
+  const webAudioCtxRef = useRef<AudioContext|null>(null);
+  const webAudioNodesRef = useRef<AudioNode[]>([]);
+
+  const stopWebAudio = () => {
+    webAudioNodesRef.current.forEach(n => { try { (n as any).stop?.(); (n as any).disconnect?.(); } catch {} });
+    webAudioNodesRef.current = [];
+    if (webAudioCtxRef.current) { webAudioCtxRef.current.close().catch(() => {}); webAudioCtxRef.current = null; }
+  };
+
+  const playWebAudioFallback = (genre: typeof SOS_MUSIC_GENRES[0]) => {
+    stopWebAudio();
+    const ctx = new AudioContext();
+    webAudioCtxRef.current = ctx;
+    const nodes: AudioNode[] = [];
+    const master = ctx.createGain();
+    master.gain.value = 0.25;
+    master.connect(ctx.destination);
+
+    // Genre-specific tone configs
+    const configs: Record<string, { freqs: number[]; type: OscillatorType; lfoRate: number; filterFreq: number }> = {
+      calm:  { freqs: [220, 277, 330], type: "sine", lfoRate: 0.1, filterFreq: 800 },
+      sad:   { freqs: [196, 233, 294], type: "triangle", lfoRate: 0.08, filterFreq: 600 },
+      happy: { freqs: [262, 330, 392, 523], type: "sine", lfoRate: 0.2, filterFreq: 2000 },
+      metal: { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
+    };
+    const cfg = configs[genre.id] || configs.calm;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = cfg.filterFreq;
+    filter.Q.value = 2;
+    filter.connect(master);
+
+    // LFO for gentle movement
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.value = cfg.lfoRate;
+    lfoGain.gain.value = 15;
+    lfo.connect(lfoGain);
+    lfoGain.connect(filter.frequency);
+    lfo.start();
+    nodes.push(lfo);
+
+    // Pad oscillators with staggered fade-in
+    cfg.freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = cfg.type;
+      osc.frequency.value = freq;
+      // Slight detune for richness
+      osc.detune.value = (i - 1) * 8;
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 1 + i * 0.5);
+      osc.connect(gain);
+      gain.connect(filter);
+      osc.start();
+      nodes.push(osc);
+    });
+
+    webAudioNodesRef.current = nodes;
+  };
+
   const playMusic = async (genre: typeof SOS_MUSIC_GENRES[0]) => {
     if (musicAudioRef.current) { musicAudioRef.current.pause(); musicAudioRef.current = null; }
+    stopWebAudio();
     setMusicGenre(genre);
     setMusicLoading(true);
     setMusicPlaying(false);
@@ -789,13 +852,22 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
       await audio.play();
       setMusicPlaying(true);
     } catch (e: any) {
-      setMusicError("Generování selhalo. Zkus to znovu.");
+      // Fallback: Web Audio API ambient tones
+      console.log("API failed, using Web Audio fallback for genre:", genre.id);
+      try {
+        playWebAudioFallback(genre);
+        setMusicPlaying(true);
+        setMusicError(null);
+      } catch {
+        setMusicError("Generování selhalo. Zkus to znovu.");
+      }
     }
     setMusicLoading(false);
   };
 
   const stopMusic = () => {
     if (musicAudioRef.current) { musicAudioRef.current.pause(); musicAudioRef.current = null; }
+    stopWebAudio();
     setMusicPlaying(false);
   };
 
@@ -807,7 +879,7 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
   };
 
   useEffect(() => {
-    return () => { if (musicAudioRef.current) { musicAudioRef.current.pause(); } };
+    return () => { if (musicAudioRef.current) { musicAudioRef.current.pause(); } stopWebAudio(); };
   }, []);
 
   const overlay: React.CSSProperties = {position:"fixed",inset:0,background:"rgba(0,0,0,0.96)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",overflowY:"auto",padding:"24px 16px",gap:16};
