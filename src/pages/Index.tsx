@@ -763,7 +763,8 @@ export default function Index() {
   const [userName, setUserName] = useState(() => localStorage.getItem("mm_name") || "");
   const [avatar, setAvatar] = useState<string|null>(() => localStorage.getItem("mm_avatar"));
   const fileRef = useRef<HTMLInputElement>(null);
-
+  const [xpPopup, setXpPopup] = useState<{xp:number;label:string}|null>(null);
+  const [levelUp, setLevelUp] = useState<{level:number;skin?:typeof MONKEY_SKINS[0]|null}|null>(null);
   const [step, setStep] = useState(1);
   const [selectedMood, setSelectedMood] = useState<any>(null);
   const [selectedReason, setSelectedReason] = useState<any>(null);
