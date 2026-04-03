@@ -433,7 +433,7 @@ export default function Index() {
               <>
                 <button onClick={()=>{setStep(1);setSelectedMood(null)}} style={{background:"none",border:"none",color:T.t2,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12,display:"flex",alignItems:"center",gap:4}}>← Zpět</button>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:T.card,borderRadius:14,border:`1px solid ${T.border}`}}>
-                  <span style={{fontSize:28}}>{selectedMood.emoji}</span>
+                  <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
                   <div>
                     <div style={{color:T.t1,fontSize:15,fontWeight:700}}>Cítíš se: {selectedMood.label}</div>
                     <div style={{color:T.t2,fontSize:12}}>Co za tím stojí?</div>
