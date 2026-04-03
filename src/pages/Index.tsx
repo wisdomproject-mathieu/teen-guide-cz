@@ -465,7 +465,7 @@ function MonkeyChat() {
 }
 
 // ── PROFILE TAB (with Mood Insights) ──
-function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void}) {
+function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void}) {
   const [activeSection, setActiveSection] = useState("overview");
   const [contacts, setContacts] = useState([{name:"",phone:""}]);
   const [diary, setDiary] = useState("");
