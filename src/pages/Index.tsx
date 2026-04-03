@@ -1283,7 +1283,7 @@ export default function Index() {
 
         {/* ════════ PROFILE TAB ════════ */}
         {tab === "profile" && (
-          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} />
+          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} />
         )}
       </div>
 
