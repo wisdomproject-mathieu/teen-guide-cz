@@ -1,7 +1,33 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import monkeyHero from "@/assets/monkey-hero.png";
+import monkeySad from "@/assets/monkey-sad.png";
+import monkeyAngry from "@/assets/monkey-angry.png";
+import monkeyZen from "@/assets/monkey-zen.png";
+import monkeyAnxious from "@/assets/monkey-anxious.png";
+import monkeySos from "@/assets/monkey-sos.png";
+import monkeyLearn from "@/assets/monkey-learn.png";
+import monkeyTrain from "@/assets/monkey-train.png";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+// Mood-to-monkey mapping
+const MOOD_MONKEY: Record<string, string> = {
+  great: monkeyHero,
+  ok: monkeyHero,
+  meh: monkeyAnxious,
+  bad: monkeySad,
+  awful: monkeySad,
+};
+const EMO_MONKEY: Record<string, string> = {
+  anger: monkeyAngry,
+  sadness: monkeySad,
+  anxiety: monkeyAnxious,
+  fear: monkeyAnxious,
+  lonely: monkeySad,
+  overwhelm: monkeyZen,
+  all: monkeyHero,
+};
 
 const T={bg:"#0A0C13",accent:"#FF7A2F",accentDim:"rgba(255,122,47,0.12)",teal:"#00D4AA",tealDim:"rgba(0,212,170,0.12)",red:"#FF3B5C",redDim:"rgba(255,59,92,0.12)",blue:"#4A8FFF",purple:"#A855F7",t1:"#F0EEFF",t2:"#9298B4",t3:"#5A6080",card:"rgba(255,255,255,0.04)",border:"rgba(255,255,255,0.08)"};
 
@@ -315,7 +341,7 @@ function ProfilePanel({onClose, moodLog, streakCount}: {onClose:()=>void; moodLo
 function SOSOverlay({onClose}: {onClose:()=>void}) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,padding:24}}>
-      <div style={{width:80,height:80,borderRadius:"50%",background:`radial-gradient(circle,${T.red},${T.red}80)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,boxShadow:`0 0 60px ${T.red}40`,animation:"pulse 2s infinite"}}>🆘</div>
+      <img src={monkeySos} alt="SOS" style={{width:100,height:100,objectFit:"contain",filter:"drop-shadow(0 0 30px rgba(255,59,92,0.5))"}} />
       <div style={{color:T.t1,fontSize:22,fontWeight:800}}>Co ti teď pomůže?</div>
       {[{icon:"🎙",label:"Motivační řeč",sub:"Goggins, Jocko, Les Brown…",color:T.accent},{icon:"🤘",label:"Těžká hudba",sub:"Nech vztek ven",color:T.red},{icon:"🌬",label:"Dýchání",sub:"Box breathing",color:T.teal}].map((o,i)=>
         <button key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"16px 20px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16,width:"100%",maxWidth:340,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
@@ -370,10 +396,10 @@ export default function Index() {
           <div>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 0"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <span style={{fontSize:28}}>🐵</span>
+                <img src={monkeyHero} alt="Monkey Mind" style={{width:44,height:44,objectFit:"contain"}} />
                 <div>
                   <div style={{color:T.accent,fontSize:11,fontWeight:800,letterSpacing:2}}>MONKEY MIND</div>
-                  <div style={{color:T.t1,fontSize:15,fontWeight:600}}>Ahoj! 🐵</div>
+                  <div style={{color:T.t1,fontSize:15,fontWeight:600}}>Yo, co je? 🤙</div>
                 </div>
               </div>
               <button onClick={()=>setShowProfile(true)} style={{width:40,height:40,borderRadius:"50%",background:T.card,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative"}}>
@@ -407,7 +433,7 @@ export default function Index() {
               <>
                 <button onClick={()=>{setStep(1);setSelectedMood(null)}} style={{background:"none",border:"none",color:T.t2,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12,display:"flex",alignItems:"center",gap:4}}>← Zpět</button>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:T.card,borderRadius:14,border:`1px solid ${T.border}`}}>
-                  <span style={{fontSize:28}}>{selectedMood.emoji}</span>
+                  <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
                   <div>
                     <div style={{color:T.t1,fontSize:15,fontWeight:700}}>Cítíš se: {selectedMood.label}</div>
                     <div style={{color:T.t2,fontSize:12}}>Co za tím stojí?</div>
@@ -432,8 +458,7 @@ export default function Index() {
               <>
                 <button onClick={resetFlow} style={{background:"none",border:"none",color:T.accent,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12}}>← Nový check-in</button>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:T.card,borderRadius:14,border:`1px solid ${T.border}`}}>
-                  <span style={{fontSize:20}}>{selectedMood.emoji}</span>
-                  <span style={{fontSize:20}}>{selectedReason.icon}</span>
+                  <img src={EMO_MONKEY[recs.emo] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
                   <div>
                     <div style={{color:T.t1,fontSize:14,fontWeight:700}}>{selectedMood.label} · {selectedReason.label}</div>
                     <div style={{color:T.t2,fontSize:12}}>Opice ti vybrala tohle 👇</div>
@@ -466,7 +491,7 @@ export default function Index() {
                 {/* Breathing */}
                 <div style={{marginBottom:20}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                    <span style={{fontSize:18}}>🌬</span>
+                    <img src={monkeyZen} alt="" style={{width:32,height:32,objectFit:"contain"}} loading="lazy" />
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Zklidni opici — dýchej</span>
                   </div>
                   <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16}}>
@@ -522,8 +547,13 @@ export default function Index() {
         {/* ════════ LEARN TAB ════════ */}
         {tab === "learn" && (
           <div style={{paddingTop:20}}>
-            <div style={{color:T.t1,fontSize:22,fontWeight:900,marginBottom:4}}>Pochop to</div>
-            <div style={{color:T.t2,fontSize:13,marginBottom:20}}>Věci co ti ve škole neřeknou</div>
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
+              <img src={monkeyLearn} alt="" style={{width:64,height:64,objectFit:"contain"}} loading="lazy" />
+              <div>
+                <div style={{color:T.t1,fontSize:22,fontWeight:900}}>Pochop to</div>
+                <div style={{color:T.t2,fontSize:13}}>Věci co ti ve škole neřeknou</div>
+              </div>
+            </div>
             {[{icon:"♂♀",title:"Rozuměj klukům a holkám",sub:"Mars/Venus, komunikace, energie",color:T.purple},{icon:"⚔",title:"Staň se válečníkem",sub:"Goggins, Jocko, Stoici, disciplína",color:T.red},{icon:"🛡",title:"Nenech se zničit",sub:"NVC, hranice, šikana, CBT",color:T.teal},{icon:"📱",title:"Tvůj mozek vs. telefon",sub:"Haidt, dopamin, spánek, pozornost",color:T.accent},{icon:"🪞",title:"Kdo jsi?",sub:"Identita, Frankl, Jung, puberta",color:T.blue}].map((g,i)=>
               <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,marginBottom:8,cursor:"pointer"}}>
                 <div style={{fontSize:28,width:44,textAlign:"center"}}>{g.icon}</div>
@@ -536,8 +566,13 @@ export default function Index() {
         {/* ════════ PRACTICE TAB ════════ */}
         {tab === "practice" && (
           <div style={{paddingTop:20}}>
-            <div style={{color:T.t1,fontSize:22,fontWeight:900,marginBottom:4}}>Trénuj svou opici</div>
-            <div style={{color:T.t2,fontSize:13,marginBottom:20}}>Nástroje pro každý den 🐵</div>
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
+              <img src={monkeyTrain} alt="" style={{width:64,height:64,objectFit:"contain"}} loading="lazy" />
+              <div>
+                <div style={{color:T.t1,fontSize:22,fontWeight:900}}>Trénuj svou opici</div>
+                <div style={{color:T.t2,fontSize:13}}>Nástroje pro každý den</div>
+              </div>
+            </div>
             {[{icon:"🐵",title:"Opičí řev",sub:"Motivační řeči — Goggins, Jocko, Les Brown",color:T.accent},{icon:"🌬",title:"Opičí klid",sub:"Box breathing, Wim Hof, 4-7-8",color:T.teal},{icon:"🎵",title:"Opičí playlist",sub:"Metal, klasika, dramatická, příroda",color:T.purple},{icon:"🎮",title:"Opičí reset",sub:"5-4-3-2-1 grounding technika",color:T.blue}].map((g,i)=>
               <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,marginBottom:8,cursor:"pointer"}}>
                 <div style={{fontSize:28,width:44,textAlign:"center"}}>{g.icon}</div>
