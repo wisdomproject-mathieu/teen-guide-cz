@@ -7,17 +7,22 @@ import monkeyAnxious from "@/assets/monkey-anxious.png";
 import monkeySos from "@/assets/monkey-sos.png";
 import monkeyLearn from "@/assets/monkey-learn.png";
 import monkeyTrain from "@/assets/monkey-train.png";
+import monkeyGreat from "@/assets/monkey-great.png";
+import monkeyOk from "@/assets/monkey-ok.png";
+import monkeyMeh from "@/assets/monkey-meh.png";
+import monkeyBad from "@/assets/monkey-bad.png";
+import monkeyAwful from "@/assets/monkey-awful.png";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Mood-to-monkey mapping
 const MOOD_MONKEY: Record<string, string> = {
-  great: monkeyHero,
-  ok: monkeyHero,
-  meh: monkeyAnxious,
-  bad: monkeySad,
-  awful: monkeySad,
+  great: monkeyGreat,
+  ok: monkeyOk,
+  meh: monkeyMeh,
+  bad: monkeyBad,
+  awful: monkeyAwful,
 };
 const EMO_MONKEY: Record<string, string> = {
   anger: monkeyAngry,
@@ -386,7 +391,34 @@ export default function Index() {
 
   return (
     <div style={{maxWidth:430,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",background:T.bg,fontFamily:"'Segoe UI',system-ui,sans-serif",color:T.t1,overflow:"hidden"}}>
-      <style>{`@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}*{box-sizing:border-box;margin:0;padding:0}::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:${T.t3};border-radius:4px}input::placeholder,textarea::placeholder{color:${T.t3}}`}</style>
+      <style>{`
+        @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        @keyframes slideInRight{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes bounceIn{0%{opacity:0;transform:scale(0.6)}60%{transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+        @keyframes glowPulse{0%,100%{box-shadow:0 0 8px rgba(255,122,47,0.2)}50%{box-shadow:0 0 20px rgba(255,122,47,0.4)}}
+        .anim-fadeUp{animation:fadeUp .4s ease-out both}
+        .anim-fadeIn{animation:fadeIn .3s ease-out both}
+        .anim-slideIn{animation:slideInRight .4s ease-out both}
+        .anim-bounce{animation:bounceIn .5s cubic-bezier(.36,1.1,.3,1) both}
+        .anim-float{animation:float 3s ease-in-out infinite}
+        .anim-d1{animation-delay:.05s}.anim-d2{animation-delay:.1s}.anim-d3{animation-delay:.15s}.anim-d4{animation-delay:.2s}.anim-d5{animation-delay:.25s}
+        .mood-btn{transition:all .2s ease;position:relative;overflow:hidden}
+        .mood-btn:hover{transform:scale(1.02);filter:brightness(1.15)}
+        .mood-btn:active{transform:scale(0.97)}
+        .card-hover{transition:all .2s ease}
+        .card-hover:hover{transform:translateY(-2px);border-color:rgba(255,122,47,0.3)!important}
+        .card-hover:active{transform:scale(0.98)}
+        .nav-btn{transition:all .2s ease}
+        .nav-btn:hover{transform:scale(1.1)}
+        .tab-monkey{transition:all .3s ease}
+        .tab-monkey:hover{transform:scale(1.05) rotate(-3deg)}
+        *{box-sizing:border-box;margin:0;padding:0}
+        ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:${T.t3};border-radius:4px}
+        input::placeholder,textarea::placeholder{color:${T.t3}}
+      `}</style>
       {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)}/>}
       {showProfile && <ProfilePanel onClose={()=>setShowProfile(false)} moodLog={moodLog} streakCount={streakCount}/>}
 
@@ -411,17 +443,19 @@ export default function Index() {
             {/* STEP 1 */}
             {step === 1 && (
               <>
-                <div style={{marginBottom:20}}>
-                  <div style={{color:T.t1,fontSize:20,fontWeight:800}}>Jak se dnes cítíš?</div>
-                  <div style={{color:T.t2,fontSize:13}}>Klikni na náladu — opice tě provede dál</div>
+                <div className="anim-fadeUp" style={{marginBottom:20}}>
+                  <div style={{color:T.t1,fontSize:22,fontWeight:900}}>Jak se dnes cítíš?</div>
+                  <div style={{color:T.t2,fontSize:13,marginTop:4}}>Vyber náladu — tvoje opice ti poradí</div>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {MOODS.map(m => (
-                    <button key={m.id} onClick={()=>selectMood(m)} style={{display:"flex",alignItems:"center",gap:14,padding:"16px 18px",background:`${m.color}08`,border:`1px solid ${m.color}20`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all .15s"}}>
-                      <span style={{fontSize:28}}>{m.emoji}</span>
-                      <div>
-                        <div style={{color:T.t1,fontSize:16,fontWeight:700}}>{m.label}</div>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {MOODS.map((m, i) => (
+                    <button key={m.id} onClick={()=>selectMood(m)} className={`mood-btn anim-fadeUp anim-d${i+1}`} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 16px",background:`linear-gradient(135deg, ${m.color}12, ${m.color}06)`,border:`1px solid ${m.color}25`,borderRadius:18,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                      <img src={MOOD_MONKEY[m.id]} alt={m.label} style={{width:52,height:52,objectFit:"contain",borderRadius:12}} />
+                      <div style={{flex:1}}>
+                        <div style={{color:T.t1,fontSize:16,fontWeight:800}}>{m.label}</div>
+                        <div style={{color:T.t2,fontSize:11,marginTop:2}}>{m.emoji}</div>
                       </div>
+                      <div style={{color:`${m.color}80`,fontSize:18}}>→</div>
                     </button>
                   ))}
                 </div>
@@ -546,18 +580,19 @@ export default function Index() {
 
         {/* ════════ LEARN TAB ════════ */}
         {tab === "learn" && (
-          <div style={{paddingTop:20}}>
-            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
-              <img src={monkeyLearn} alt="" style={{width:64,height:64,objectFit:"contain"}} loading="lazy" />
+          <div style={{paddingTop:16}} className="anim-fadeUp">
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20,padding:16,background:`linear-gradient(135deg, ${T.purple}15, transparent)`,borderRadius:20,border:`1px solid ${T.purple}20`}}>
+              <img src={monkeyLearn} alt="" className="tab-monkey" style={{width:72,height:72,objectFit:"contain"}} loading="lazy" />
               <div>
-                <div style={{color:T.t1,fontSize:22,fontWeight:900}}>Pochop to</div>
-                <div style={{color:T.t2,fontSize:13}}>Věci co ti ve škole neřeknou</div>
+                <div style={{color:T.t1,fontSize:24,fontWeight:900,letterSpacing:-0.5}}>Pochop to</div>
+                <div style={{color:T.t2,fontSize:13,marginTop:2}}>Věci co ti ve škole neřeknou</div>
               </div>
             </div>
             {[{icon:"♂♀",title:"Rozuměj klukům a holkám",sub:"Mars/Venus, komunikace, energie",color:T.purple},{icon:"⚔",title:"Staň se válečníkem",sub:"Goggins, Jocko, Stoici, disciplína",color:T.red},{icon:"🛡",title:"Nenech se zničit",sub:"NVC, hranice, šikana, CBT",color:T.teal},{icon:"📱",title:"Tvůj mozek vs. telefon",sub:"Haidt, dopamin, spánek, pozornost",color:T.accent},{icon:"🪞",title:"Kdo jsi?",sub:"Identita, Frankl, Jung, puberta",color:T.blue}].map((g,i)=>
-              <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,marginBottom:8,cursor:"pointer"}}>
-                <div style={{fontSize:28,width:44,textAlign:"center"}}>{g.icon}</div>
-                <div><div style={{color:T.t1,fontSize:15,fontWeight:700}}>{g.title}</div><div style={{color:T.t2,fontSize:12}}>{g.sub}</div></div>
+              <div key={i} className={`card-hover anim-slideIn anim-d${i+1}`} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:`linear-gradient(135deg, ${g.color}08, transparent)`,border:`1px solid ${g.color}15`,borderRadius:16,marginBottom:10,cursor:"pointer"}}>
+                <div style={{fontSize:26,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:`${g.color}15`,borderRadius:12}}>{g.icon}</div>
+                <div style={{flex:1}}><div style={{color:T.t1,fontSize:15,fontWeight:700}}>{g.title}</div><div style={{color:T.t2,fontSize:12,marginTop:2}}>{g.sub}</div></div>
+                <div style={{color:`${g.color}60`,fontSize:16}}>→</div>
               </div>
             )}
           </div>
@@ -565,18 +600,19 @@ export default function Index() {
 
         {/* ════════ PRACTICE TAB ════════ */}
         {tab === "practice" && (
-          <div style={{paddingTop:20}}>
-            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
-              <img src={monkeyTrain} alt="" style={{width:64,height:64,objectFit:"contain"}} loading="lazy" />
+          <div style={{paddingTop:16}} className="anim-fadeUp">
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20,padding:16,background:`linear-gradient(135deg, ${T.accent}15, transparent)`,borderRadius:20,border:`1px solid ${T.accent}20`}}>
+              <img src={monkeyTrain} alt="" className="tab-monkey" style={{width:72,height:72,objectFit:"contain"}} loading="lazy" />
               <div>
-                <div style={{color:T.t1,fontSize:22,fontWeight:900}}>Trénuj svou opici</div>
-                <div style={{color:T.t2,fontSize:13}}>Nástroje pro každý den</div>
+                <div style={{color:T.t1,fontSize:24,fontWeight:900,letterSpacing:-0.5}}>Trénuj svou opici</div>
+                <div style={{color:T.t2,fontSize:13,marginTop:2}}>Nástroje pro každý den</div>
               </div>
             </div>
             {[{icon:"🐵",title:"Opičí řev",sub:"Motivační řeči — Goggins, Jocko, Les Brown",color:T.accent},{icon:"🌬",title:"Opičí klid",sub:"Box breathing, Wim Hof, 4-7-8",color:T.teal},{icon:"🎵",title:"Opičí playlist",sub:"Metal, klasika, dramatická, příroda",color:T.purple},{icon:"🎮",title:"Opičí reset",sub:"5-4-3-2-1 grounding technika",color:T.blue}].map((g,i)=>
-              <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,marginBottom:8,cursor:"pointer"}}>
-                <div style={{fontSize:28,width:44,textAlign:"center"}}>{g.icon}</div>
-                <div><div style={{color:T.t1,fontSize:15,fontWeight:700}}>{g.title}</div><div style={{color:T.t2,fontSize:12}}>{g.sub}</div></div>
+              <div key={i} className={`card-hover anim-slideIn anim-d${i+1}`} style={{display:"flex",alignItems:"center",gap:14,padding:16,background:`linear-gradient(135deg, ${g.color}08, transparent)`,border:`1px solid ${g.color}15`,borderRadius:16,marginBottom:10,cursor:"pointer"}}>
+                <div style={{fontSize:26,width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:`${g.color}15`,borderRadius:12}}>{g.icon}</div>
+                <div style={{flex:1}}><div style={{color:T.t1,fontSize:15,fontWeight:700}}>{g.title}</div><div style={{color:T.t2,fontSize:12,marginTop:2}}>{g.sub}</div></div>
+                <div style={{color:`${g.color}60`,fontSize:16}}>→</div>
               </div>
             )}
           </div>
@@ -584,16 +620,18 @@ export default function Index() {
       </div>
 
       {/* ── BOTTOM NAV ── */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",padding:"8px 0 12px",borderTop:`1px solid ${T.border}`,background:T.bg,flexShrink:0}}>
-        <button onClick={()=>{setTab("feel");resetFlow()}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="feel"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
-          <span style={{fontSize:20}}>💭</span>CÍTÍM
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-around",padding:"6px 0 10px",borderTop:`1px solid ${T.border}`,background:`linear-gradient(to top, ${T.bg}, rgba(10,12,19,0.95))`,flexShrink:0}}>
+        <button onClick={()=>{setTab("feel");resetFlow()}} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="feel"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
+          <img src={monkeyHero} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="feel"?1:0.5,transition:"opacity .2s"}} />CÍTÍM
         </button>
-        <button onClick={()=>setShowSOS(true)} style={{width:62,height:62,borderRadius:"50%",background:`radial-gradient(circle,${T.red},#CC2040)`,border:"3px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,cursor:"pointer",boxShadow:`0 4px 24px ${T.red}50`,transform:"translateY(-10px)",animation:"pulse 3s infinite"}}>🆘</button>
-        <button onClick={()=>setTab("learn")} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="learn"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
-          <span style={{fontSize:20}}>💡</span>POCHOP TO
+        <button onClick={()=>setShowSOS(true)} className="nav-btn" style={{width:62,height:62,borderRadius:"50%",background:`radial-gradient(circle,${T.red},#CC2040)`,border:"3px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:`0 4px 24px ${T.red}50`,transform:"translateY(-10px)",animation:"pulse 3s infinite"}}>
+          <img src={monkeySos} alt="SOS" style={{width:36,height:36,objectFit:"contain"}} />
         </button>
-        <button onClick={()=>setTab("practice")} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="practice"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
-          <span style={{fontSize:20}}>🐵</span>TRÉNUJ
+        <button onClick={()=>setTab("learn")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="learn"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
+          <img src={monkeyLearn} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="learn"?1:0.5,transition:"opacity .2s"}} />POCHOP TO
+        </button>
+        <button onClick={()=>setTab("practice")} className="nav-btn" style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 0",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",color:tab==="practice"?T.accent:T.t3,fontSize:10,fontWeight:700}}>
+          <img src={monkeyTrain} alt="" style={{width:28,height:28,objectFit:"contain",opacity:tab==="practice"?1:0.5,transition:"opacity .2s"}} />TRÉNUJ
         </button>
       </div>
     </div>
