@@ -48,6 +48,7 @@ const MOOD_MONKEY: Record<string, string> = {
 const EMO_MONKEY: Record<string, string> = {
   anger: monkeyAngry, sadness: monkeySad, anxiety: monkeyAnxious,
   fear: monkeyAnxious, lonely: monkeySad, overwhelm: monkeyZen, all: monkeyHero,
+  positive: monkeyGreat,
 };
 
 const T={bg:"#0A0C13",accent:"#FF7A2F",accentDim:"rgba(255,122,47,0.12)",teal:"#00D4AA",tealDim:"rgba(0,212,170,0.12)",red:"#FF3B5C",redDim:"rgba(255,59,92,0.12)",blue:"#4A8FFF",purple:"#A855F7",t1:"#F0EEFF",t2:"#9298B4",t3:"#5A6080",card:"rgba(255,255,255,0.04)",border:"rgba(255,255,255,0.08)"};
