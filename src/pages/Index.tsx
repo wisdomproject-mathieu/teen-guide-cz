@@ -614,8 +614,39 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
   const [contacts, setContacts] = useState([{name:"",phone:""}]);
   const [diary, setDiary] = useState("");
   const days = ["Po","Út","St","Čt","Pá","So","Ne"];
+
+  // Build calendar based on actual dates, not mood log index
   const calendarWeeks: any[] = [];
-  for(let w=0;w<4;w++){const week=[];for(let d=0;d<7;d++){const dayIdx=w*7+d;week.push(moodLog[dayIdx]||null)}calendarWeeks.push(week)}
+  const today = new Date();
+  // Show 4 weeks ending today — find the Monday 3 weeks ago
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - 27); // go back ~4 weeks
+  // Adjust to Monday
+  const dayOfWeek = startDate.getDay(); // 0=Sun
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  startDate.setDate(startDate.getDate() + mondayOffset);
+
+  // Group mood logs by date string
+  const moodByDate: Record<string, any> = {};
+  moodLog.forEach((l: any) => {
+    // Parse the Czech date format "D. M. YYYY, HH:MM:SS"
+    const parts = l.ts.match(/(\d+)\.\s*(\d+)\.\s*(\d+)/);
+    if (parts) {
+      const dateKey = `${parts[3]}-${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+      if (!moodByDate[dateKey]) moodByDate[dateKey] = l; // first (most recent) entry for that day
+    }
+  });
+
+  for (let w = 0; w < 4; w++) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      const cellDate = new Date(startDate);
+      cellDate.setDate(startDate.getDate() + w * 7 + d);
+      const key = cellDate.toISOString().split("T")[0];
+      week.push(moodByDate[key] || null);
+    }
+    calendarWeeks.push(week);
+  }
 
   return (
     <div style={{paddingTop:8}} className="anim-fadeUp">
