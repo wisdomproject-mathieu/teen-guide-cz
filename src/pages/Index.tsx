@@ -48,6 +48,7 @@ const MOOD_MONKEY: Record<string, string> = {
 const EMO_MONKEY: Record<string, string> = {
   anger: monkeyAngry, sadness: monkeySad, anxiety: monkeyAnxious,
   fear: monkeyAnxious, lonely: monkeySad, overwhelm: monkeyZen, all: monkeyHero,
+  positive: monkeyGreat,
 };
 
 const T={bg:"#0A0C13",accent:"#FF7A2F",accentDim:"rgba(255,122,47,0.12)",teal:"#00D4AA",tealDim:"rgba(0,212,170,0.12)",red:"#FF3B5C",redDim:"rgba(255,59,92,0.12)",blue:"#4A8FFF",purple:"#A855F7",t1:"#F0EEFF",t2:"#9298B4",t3:"#5A6080",card:"rgba(255,255,255,0.04)",border:"rgba(255,255,255,0.08)"};
@@ -114,9 +115,33 @@ const REASONS=[
   {id:"other",label:"Jiné",sub:"Něco jiného"},
 ];
 
+// Positive mood speeches — for great/pumped feelings with reasons
+const POSITIVE_SPEECHES = [
+  {id:"p1",emo:"positive",reason:["parents"],icon:"💛",title:"Rodiče jsou základ.",src:"Motivace",color:T.teal,text:"Máš super den díky rodině? To je vzácný. Hodně lidí to nemá. Pamatuj si tenhle moment — až bude jednou těžko, vrať se sem. Tahle energie je tvoje palivo. A rodiče? I když to občas skřípe — tenhle pocit je důkaz, že to funguje."},
+  {id:"p2",emo:"positive",reason:["siblings"],icon:"🤜",title:"Sourozenci = tvůj tým.",src:"Psychologie",color:T.teal,text:"Dobrá vibe s bráchou nebo ségrou? To je zlato. Jednou budou tvoji nejbližší lidi na planetě. Tohle je moment, kdy se buduje celoživotní bond. Užij si to. A řekni jim, že jsou hustý."},
+  {id:"p3",emo:"positive",reason:["friends"],icon:"🤝",title:"Parťáci na celej život.",src:"Motivace",color:T.teal,text:"Dobří kámoši jsou jako vzácný loot. Když máš dobrej den díky nim — řekni jim to. Lidi potřebujou slyšet, že jsou důležitý. A ty máš tu sílu to udělat právě teď."},
+  {id:"p4",emo:"positive",reason:["school"],icon:"📚",title:"Škola tě neporazí.",src:"Growth Mindset",color:T.teal,text:"Dobrý den ve škole? To je důkaz, že to zvládáš. Každý dobrý den je cihla. A ty stavíš. Nemusíš být nejlepší — stačí být lepší než včera. A dneska to jde. Tak jdi dál."},
+  {id:"p5",emo:"positive",reason:["social"],icon:"📱",title:"Zdravý social = power.",src:"Motivace",color:T.teal,text:"Pozitivní vibe ze sítí? To je vzácný. Většinou nás to stahuje dolů. Ale když najdeš komunitu nebo obsah, co tě nabíjí — drž se toho. To je tvůj digitální kmen."},
+  {id:"p6",emo:"positive",reason:["identity"],icon:"🪞",title:"Znáš sám sebe.",src:"Stoicismus",color:T.teal,text:"Cítíš se dobře sám se sebou? To je nejcennější skill, co existuje. Marcus Aurelius říkal: kdo zná sebe, zná vesmír. Dneska jsi na to přišel. Zapamatuj si to."},
+  {id:"p7",emo:"positive",reason:["lonely"],icon:"🌟",title:"Samota jako superpower.",src:"Rilke",color:T.teal,text:"Jsi sám/a a cítíš se dobře? To je next level. Většina lidí se bojí ticha. Ty v něm nacházíš sílu. Rilke říkal: samota je laboratoř velikosti. A ty právě experimentuješ."},
+  {id:"p8",emo:"positive",reason:["other"],icon:"✨",title:"Good vibes only.",src:"Monkey Mind",color:T.teal,text:"Dobrý den je dobrý den. Nemusíš to analyzovat. Prostě si ho užij. Opice tančí. 🐵 A pamatuj — tenhle pocit si zasloužíš. Vždycky."},
+];
+
 function getRecommendations(mood: any, reason: any) {
-  const emoMap: Record<string,string> = {great:"all",pumped:"all",meh:"anxiety",angry:"anger",sad:"sadness",anxious:"anxiety",awful:"sadness"};
+  const isPositive = mood?.id === "great" || mood?.id === "pumped";
+  const emoMap: Record<string,string> = {great:"positive",pumped:"positive",meh:"anxiety",angry:"anger",sad:"sadness",anxious:"anxiety",awful:"sadness"};
   const realEmo = emoMap[mood?.id] || "all";
+
+  if (isPositive) {
+    // For positive moods, use positive speeches matched to reason
+    let speeches = POSITIVE_SPEECHES.filter(s => s.reason.includes(reason?.id));
+    // Add some generic positive ones
+    const generic = SPEECHES.filter(s => s.emo === "all");
+    speeches = [...speeches, ...generic].slice(0, 4);
+    if (speeches.length < 2) speeches = [...POSITIVE_SPEECHES.slice(0, 2), ...generic.slice(0, 2)];
+    return { speeches, breathType: "box", showMetal: false, showGrounding: false, emo: realEmo };
+  }
+
   let speeches = SPEECHES.filter(s => {
     if (s.emo === "all") return true;
     if (s.emo !== realEmo) return false;
@@ -614,8 +639,39 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
   const [contacts, setContacts] = useState([{name:"",phone:""}]);
   const [diary, setDiary] = useState("");
   const days = ["Po","Út","St","Čt","Pá","So","Ne"];
+
+  // Build calendar based on actual dates, not mood log index
   const calendarWeeks: any[] = [];
-  for(let w=0;w<4;w++){const week=[];for(let d=0;d<7;d++){const dayIdx=w*7+d;week.push(moodLog[dayIdx]||null)}calendarWeeks.push(week)}
+  const today = new Date();
+  // Show 4 weeks ending today — find the Monday 3 weeks ago
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - 27); // go back ~4 weeks
+  // Adjust to Monday
+  const dayOfWeek = startDate.getDay(); // 0=Sun
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  startDate.setDate(startDate.getDate() + mondayOffset);
+
+  // Group mood logs by date string
+  const moodByDate: Record<string, any> = {};
+  moodLog.forEach((l: any) => {
+    // Parse the Czech date format "D. M. YYYY, HH:MM:SS"
+    const parts = l.ts.match(/(\d+)\.\s*(\d+)\.\s*(\d+)/);
+    if (parts) {
+      const dateKey = `${parts[3]}-${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+      if (!moodByDate[dateKey]) moodByDate[dateKey] = l; // first (most recent) entry for that day
+    }
+  });
+
+  for (let w = 0; w < 4; w++) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      const cellDate = new Date(startDate);
+      cellDate.setDate(startDate.getDate() + w * 7 + d);
+      const key = cellDate.toISOString().split("T")[0];
+      week.push(moodByDate[key] || null);
+    }
+    calendarWeeks.push(week);
+  }
 
   return (
     <div style={{paddingTop:8}} className="anim-fadeUp">
@@ -1091,7 +1147,20 @@ export default function Index() {
   const selectReason = (r: any) => {
     setSelectedReason(r);
     cloud.logMood(selectedMood.id, r.id);
-    const newStreak = streakCount + 1;
+    const today = new Date().toISOString().split("T")[0];
+    const isNewDay = lastCheckinDate !== today;
+    let newStreak = streakCount;
+    if (isNewDay) {
+      // Check if yesterday was the last check-in (continuing streak) or gap (reset)
+      if (lastCheckinDate) {
+        const lastDate = new Date(lastCheckinDate);
+        const diff = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
+        newStreak = diff <= 1 ? streakCount + 1 : 1;
+      } else {
+        newStreak = 1; // first ever check-in
+      }
+    }
+    // else: same day, streak stays the same
     cloud.updateProgress(xp, newStreak, completedQuests);
     setRecs(getRecommendations(selectedMood, r));
     setStep(3);
