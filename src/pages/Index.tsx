@@ -4,6 +4,7 @@ import { useCloudData } from "@/hooks/useCloudData";
 import Onboarding from "@/components/Onboarding";
 import InAppNotifications from "@/components/InAppNotifications";
 import { useAuth } from "@/hooks/useAuth";
+import { getRecommendations } from "@/data/speeches";
 import monkeyHero from "@/assets/monkey-hero.png";
 import monkeySad from "@/assets/monkey-sad.png";
 import monkeyAngry from "@/assets/monkey-angry.png";
