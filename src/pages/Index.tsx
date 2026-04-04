@@ -1091,7 +1091,20 @@ export default function Index() {
   const selectReason = (r: any) => {
     setSelectedReason(r);
     cloud.logMood(selectedMood.id, r.id);
-    const newStreak = streakCount + 1;
+    const today = new Date().toISOString().split("T")[0];
+    const isNewDay = lastCheckinDate !== today;
+    let newStreak = streakCount;
+    if (isNewDay) {
+      // Check if yesterday was the last check-in (continuing streak) or gap (reset)
+      if (lastCheckinDate) {
+        const lastDate = new Date(lastCheckinDate);
+        const diff = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
+        newStreak = diff <= 1 ? streakCount + 1 : 1;
+      } else {
+        newStreak = 1; // first ever check-in
+      }
+    }
+    // else: same day, streak stays the same
     cloud.updateProgress(xp, newStreak, completedQuests);
     setRecs(getRecommendations(selectedMood, r));
     setStep(3);
