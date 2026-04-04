@@ -56,6 +56,32 @@ const T={bg:"#0A0C13",accent:"#FF7A2F",accentDim:"rgba(255,122,47,0.12)",teal:"#
 
 // Speeches moved to src/data/speeches.ts
 
+const MOODS=[
+  {id:"great",label:"Skvěle",sub:"Mám energii, svět je můj",color:T.teal},
+  {id:"pumped",label:"Nabitej/á",sub:"Ready na cokoliv",color:T.blue},
+  {id:"meh",label:"Tak nějak",sub:"Nic moc, nic málo",color:T.accent},
+  {id:"angry",label:"Naštvanej/á",sub:"Všechno mě sere",color:T.red},
+  {id:"sad",label:"Smutnej/á",sub:"Bolí to uvnitř",color:T.purple},
+  {id:"anxious",label:"Úzkostnej/á",sub:"Svírá mě to",color:"#FF7A2F"},
+  {id:"awful",label:"Na dně",sub:"Nevím co dál",color:T.red},
+];
+
+const REASON_MONKEY: Record<string, string> = {
+  school: monkeySchool, siblings: monkeySiblings, parents: monkeyParents,
+  friends: monkeyFriends, social: monkeySocial, identity: monkeyIdentity,
+  lonely: monkeyLonely, other: monkeyOther,
+};
+const REASONS=[
+  {id:"school",label:"Škola",sub:"Zkoušky, učitelé, tlak"},
+  {id:"siblings",label:"Sourozenci",sub:"Hádky, žárlivost"},
+  {id:"parents",label:"Rodiče",sub:"Nerozumí mi, tlačí"},
+  {id:"friends",label:"Kamarádi",sub:"Zrada, vyloučení, tlak"},
+  {id:"social",label:"Sítě & mobil",sub:"Scrollování, srovnávání"},
+  {id:"identity",label:"Já sám/a",sub:"Kdo jsem? Tělo, identita"},
+  {id:"lonely",label:"Osamělost",sub:"Nikdo mě nechápe"},
+  {id:"other",label:"Jiné",sub:"Něco jiného"},
+];
+
 const audioCache = new Map<string, string>();
 
 // ── SPEECH PLAYER ──
