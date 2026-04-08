@@ -1250,6 +1250,17 @@ export default function Index() {
       {levelUp && <LevelUpOverlay level={levelUp.level} skin={levelUp.skin} onDone={() => setLevelUp(null)} />}
 
       <div style={{flex:1,overflowY:"auto",padding:"0 16px 16px",display:"flex",flexDirection:"column"}}>
+        {/* Trial banner */}
+        {premium.isTrial && (
+          <div style={{padding:"8px 16px",background:`linear-gradient(90deg, ${T.accent}20, ${T.purple}15)`,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between",margin:"8px 0"}}>
+            <div style={{color:T.accent,fontSize:12,fontWeight:700}}>👑 Premium trial · {premium.trialDaysLeft} dní zbývá</div>
+          </div>
+        )}
+        {premium.status === "expired" && (
+          <button onClick={()=>requirePremium("Premium")} style={{padding:"10px 16px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:12,color:T.accent,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",margin:"8px 0",textAlign:"center"}}>
+            ⏰ Trial skončil — odemkni Premium za 99 CZK/měs
+          </button>
+        )}
         {/* ════════ FEEL TAB ════════ */}
         {tab === "feel" && (
           <div>
