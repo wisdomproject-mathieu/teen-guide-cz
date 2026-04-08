@@ -1278,14 +1278,58 @@ export default function Index() {
               </>
             )}
 
-            {/* STEP 2 — why */}
-            {step === 2 && (
+            {/* STEP 2 — intensity slider */}
+            {step === 2 && selectedMood && (
               <>
                 <button onClick={()=>{setStep(1);setSelectedMood(null)}} style={{background:"none",border:"none",color:T.t2,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12,display:"flex",alignItems:"center",gap:4}}>← Zpět</button>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
+                <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
                   <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
                   <div>
                     <div style={{color:T.t1,fontSize:15,fontWeight:700}}>Cítíš se: {selectedMood.label}</div>
+                    <div style={{color:T.t2,fontSize:12}}>Jak moc to cítíš?</div>
+                  </div>
+                </div>
+                <div className="anim-fadeUp" style={{padding:20,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,marginBottom:16}}>
+                  <div style={{color:T.t1,fontSize:18,fontWeight:800,marginBottom:12,textAlign:"center"}}>Intenzita: {intensity}/5</div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+                    <span style={{color:T.t2,fontSize:20}}>😌</span>
+                    <input type="range" min={1} max={5} value={intensity} onChange={e=>setIntensity(Number(e.target.value))}
+                      style={{flex:1,accentColor:selectedMood.color,height:8,cursor:"pointer"}} />
+                    <span style={{color:T.t2,fontSize:20}}>🔥</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+                    {[1,2,3,4,5].map(n => (
+                      <button key={n} onClick={()=>setIntensity(n)}
+                        style={{width:40,height:40,borderRadius:"50%",background:intensity===n?`${selectedMood.color}30`:T.card,border:`2px solid ${intensity===n?selectedMood.color:T.border}`,color:intensity===n?selectedMood.color:T.t3,fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit",transition:"all .2s"}}>{n}</button>
+                    ))}
+                  </div>
+                  <div style={{color:T.t2,fontSize:13,textAlign:"center",marginBottom:4}}>
+                    {intensity <= 2 ? "Lehce to cítíš — jemný přístup" : intensity <= 3 ? "Střední intenzita" : intensity === 4 ? "Cítíš to silně" : "Na plný — Goggins mode 💀"}
+                  </div>
+                </div>
+                {/* Peer echo */}
+                {Object.values(peerEcho).reduce((a,b)=>a+b,0) > 0 && (
+                  <div className="anim-fadeUp anim-d2" style={{padding:12,background:`${selectedMood.color}08`,border:`1px solid ${selectedMood.color}15`,borderRadius:12,marginBottom:16,textAlign:"center"}}>
+                    <span style={{color:selectedMood.color,fontSize:14,fontWeight:700}}>
+                      {peerEcho[selectedMood.id] || 0} opičích válečníků cítí {selectedMood.label.toLowerCase()} dnes
+                    </span>
+                    <div style={{color:T.t3,fontSize:11,marginTop:2}}>Nejsi v tom sám/a 🐵</div>
+                  </div>
+                )}
+                <button onClick={confirmIntensity} className="reason-card" style={{width:"100%",padding:"14px 0",background:`linear-gradient(135deg, ${selectedMood.color}20, ${selectedMood.color}08)`,border:`1px solid ${selectedMood.color}30`,borderRadius:14,color:selectedMood.color,fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+                  Pokračuj →
+                </button>
+              </>
+            )}
+
+            {/* STEP 3 — why */}
+            {step === 3 && (
+              <>
+                <button onClick={()=>setStep(2)} style={{background:"none",border:"none",color:T.t2,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12,display:"flex",alignItems:"center",gap:4}}>← Zpět</button>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
+                  <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
+                  <div>
+                    <div style={{color:T.t1,fontSize:15,fontWeight:700}}>Cítíš se: {selectedMood.label} ({intensity}/5)</div>
                     <div style={{color:T.t2,fontSize:12}}>Co za tím stojí?</div>
                   </div>
                 </div>
@@ -1305,8 +1349,8 @@ export default function Index() {
               </>
             )}
 
-            {/* STEP 3 — tailored results (merged: speeches + breathing + tools) */}
-            {step === 3 && recs && (
+            {/* STEP 4 — tailored results */}
+            {step === 4 && recs && (
               <>
                 <button onClick={resetFlow} style={{background:"none",border:"none",color:T.accent,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12}}>← Nový check-in</button>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
