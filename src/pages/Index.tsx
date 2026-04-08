@@ -1389,7 +1389,7 @@ export default function Index() {
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Řeč pro tebe</span>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                    {recs.speeches.map((s: any) => (
+                    {(premium.isPremium ? recs.speeches : recs.speeches.slice(0,1)).map((s: any) => (
                       <div key={s.id} className="speech-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                           <span style={{fontSize:22}}>{s.icon}</span>
@@ -1402,6 +1402,15 @@ export default function Index() {
                         <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo} intensity={intensity} onComplete={()=>handleSpeechComplete(s)}/>
                       </div>
                     ))}
+                    {!premium.isPremium && recs.speeches.length > 1 && (
+                      <button onClick={()=>requirePremium("Plná knihovna řečí")} className="reason-card" style={{display:"flex",alignItems:"center",gap:12,padding:16,background:`${T.accent}08`,border:`1px dashed ${T.accent}40`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                        <span style={{fontSize:28}}>🔒</span>
+                        <div>
+                          <div style={{color:T.accent,fontSize:14,fontWeight:800}}>+{recs.speeches.length - 1} dalších řečí</div>
+                          <div style={{color:T.t2,fontSize:12}}>Odemkni Premium pro přístup ke všem</div>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 </div>
 
