@@ -1,6 +1,5 @@
 import { useState } from "react";
 import monkeyHero from "@/assets/monkey-hero.png";
-import monkeyZen from "@/assets/monkey-zen.png";
 import monkeyGreat from "@/assets/monkey-great.png";
 import monkeyMeh from "@/assets/monkey-meh.png";
 import monkeyAngryMood from "@/assets/monkey-angry-mood.png";
@@ -37,8 +36,8 @@ interface OnboardingProps {
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
+  // 2-screen flow: Welcome → Mood (skip name, ask later)
   const [screen, setScreen] = useState(0);
-  const [name, setName] = useState("");
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [animOut, setAnimOut] = useState(false);
 
@@ -53,7 +52,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const finish = (moodId: string) => {
     setSelectedMood(moodId);
     setAnimOut(true);
-    setTimeout(() => onComplete(name.trim() || "Opice", moodId), 500);
+    // Pass empty name — will be prompted after first check-in
+    setTimeout(() => onComplete("", moodId), 500);
   };
 
   return (
@@ -71,11 +71,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         filter: "blur(60px)", pointerEvents: "none",
       }} />
 
-      {/* Progress dots */}
-      <div style={{
-        position: "absolute", top: 48, display: "flex", gap: 10,
-      }}>
-        {[0, 1, 2].map(i => (
+      {/* Progress dots — now 2 steps */}
+      <div style={{ position: "absolute", top: 48, display: "flex", gap: 10 }}>
+        {[0, 1].map(i => (
           <div key={i} style={{
             width: i === screen ? 28 : 8, height: 8, borderRadius: 99,
             background: i <= screen ? T.accent : T.border,
@@ -94,24 +92,24 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             : "onb-slideIn .5s cubic-bezier(.4,0,.2,1) both",
         }}
       >
-        {/* ─── SCREEN 0: WELCOME ─── */}
+        {/* ─── SCREEN 0: WELCOME (condensed) ─── */}
         {screen === 0 && (
           <>
             <img
               src={monkeyHero}
               alt="Monkey Mind"
               style={{
-                width: 160, height: 160, objectFit: "contain",
+                width: 140, height: 140, objectFit: "contain",
                 filter: `drop-shadow(0 0 40px ${T.accent}40)`,
                 animation: "onb-float 3s ease-in-out infinite",
               }}
             />
             <div style={{
-              fontSize: 32, fontWeight: 900, color: T.t1, textAlign: "center",
+              fontSize: 28, fontWeight: 900, color: T.t1, textAlign: "center",
               lineHeight: 1.2, letterSpacing: "-0.02em",
             }}>
-              Yo! Jsem tvoje
-              <br />
+              Tvoje
+              {" "}
               <span style={{
                 background: `linear-gradient(135deg, ${T.accent}, ${T.teal})`,
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
@@ -121,14 +119,12 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               {" "}🐵
             </div>
             <p style={{
-              color: T.t2, fontSize: 15, textAlign: "center",
+              color: T.t2, fontSize: 14, textAlign: "center",
               lineHeight: 1.6, maxWidth: 300,
             }}>
-              Tvůj parťák na dny, kdy to sere.
+              Motivační řeči, dýchání, AI chat.
               <br />
-              Motivační řeči, dýchání, AI chat a výzvy.
-              <br />
-              <span style={{ color: T.accent, fontWeight: 700 }}>Bez keců. Bez souzení. Pro tebe.</span>
+              <span style={{ color: T.accent, fontWeight: 700 }}>Bez keců. Pro tebe. Za 90 vteřin.</span>
             </p>
             <button
               onClick={goNext}
@@ -143,93 +139,22 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               onMouseDown={e => (e.currentTarget.style.transform = "scale(0.96)")}
               onMouseUp={e => (e.currentTarget.style.transform = "scale(1)")}
             >
-              Jdeme na to! 🚀
+              Jak se cítíš? →
             </button>
           </>
         )}
 
-        {/* ─── SCREEN 1: NAME INPUT ─── */}
+        {/* ─── SCREEN 1: MOOD CHECK (straight to value) ─── */}
         {screen === 1 && (
-          <>
-            <img
-              src={monkeyZen}
-              alt="Zen monkey"
-              style={{
-                width: 120, height: 120, objectFit: "contain",
-                filter: `drop-shadow(0 0 30px ${T.teal}30)`,
-                animation: "onb-float 3s ease-in-out infinite",
-              }}
-            />
-            <div style={{
-              fontSize: 26, fontWeight: 900, color: T.t1, textAlign: "center",
-              lineHeight: 1.3,
-            }}>
-              Jak ti mám říkat? 🤙
-            </div>
-            <p style={{ color: T.t2, fontSize: 14, textAlign: "center" }}>
-              Přezdívka, jméno, cokoliv — je to jen mezi námi
-            </p>
-            <div style={{ width: "100%", position: "relative" }}>
-              <input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="Tvoje jméno nebo přezdívka…"
-                maxLength={30}
-                autoFocus
-                style={{
-                  width: "100%", padding: "16px 20px", fontSize: 18,
-                  fontWeight: 600, fontFamily: "inherit",
-                  background: T.card, border: `2px solid ${name ? T.accent : T.border}`,
-                  borderRadius: 16, color: T.t1, outline: "none",
-                  transition: "border-color .3s",
-                  boxSizing: "border-box",
-                }}
-                onKeyDown={e => { if (e.key === "Enter" && name.trim()) goNext(); }}
-              />
-              {name.length > 0 && (
-                <span style={{
-                  position: "absolute", right: 16, top: "50%",
-                  transform: "translateY(-50%)", color: T.t3, fontSize: 12,
-                }}>
-                  {name.length}/30
-                </span>
-              )}
-            </div>
-            <button
-              onClick={goNext}
-              disabled={!name.trim()}
-              style={{
-                padding: "16px 48px", borderRadius: 99,
-                background: name.trim()
-                  ? `linear-gradient(135deg, ${T.accent}, #FF5500)`
-                  : T.card,
-                border: name.trim() ? "none" : `1px solid ${T.border}`,
-                color: name.trim() ? "#fff" : T.t3,
-                fontSize: 18, fontWeight: 800, cursor: name.trim() ? "pointer" : "not-allowed",
-                fontFamily: "inherit",
-                boxShadow: name.trim() ? `0 8px 32px ${T.accent}40` : "none",
-                transition: "all .3s",
-                opacity: name.trim() ? 1 : 0.5,
-              }}
-            >
-              Pokračovat →
-            </button>
-          </>
-        )}
-
-        {/* ─── SCREEN 2: FIRST MOOD CHECK ─── */}
-        {screen === 2 && (
           <>
             <div style={{
               fontSize: 24, fontWeight: 900, color: T.t1, textAlign: "center",
               lineHeight: 1.3,
             }}>
-              Jak se teď cítíš,
-              <br />
-              <span style={{ color: T.accent }}>{name.trim() || "Opice"}</span>? 🐵
+              Jaká je teď tvoje nálada? 🐵
             </div>
             <p style={{ color: T.t2, fontSize: 13, textAlign: "center" }}>
-              Vyber náladu — podle toho ti připravím obsah
+              Klikni — opice ti připraví obsah na míru
             </p>
             <div style={{
               display: "grid", gridTemplateColumns: "1fr 1fr",
