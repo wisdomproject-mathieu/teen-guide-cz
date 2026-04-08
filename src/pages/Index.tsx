@@ -1073,6 +1073,9 @@ export default function Index() {
   const [step, setStep] = useState(1);
   const [selectedMood, setSelectedMood] = useState<any>(null);
   const [selectedReason, setSelectedReason] = useState<any>(null);
+  const [intensity, setIntensity] = useState(3);
+  const [peerEcho, setPeerEcho] = useState<Record<string, number>>({});
+  const [shareCard, setShareCard] = useState<{quote:string;rank:string;mood:string}|null>(null);
   const [recs, setRecs] = useState<any>(null);
 
   // Show onboarding for new users (onboarded flag not set)
