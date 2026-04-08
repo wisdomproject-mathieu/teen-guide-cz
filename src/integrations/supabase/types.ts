@@ -151,7 +151,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_today_mood_counts: {
+        Args: never
+        Returns: {
+          count: number
+          mood_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
