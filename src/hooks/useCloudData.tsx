@@ -13,6 +13,8 @@ export function useCloudData() {
   const [userName, setUserName] = useState("");
   const [lastCheckinDate, setLastCheckinDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [diaryEntries, setDiaryEntries] = useState<any[]>([]);
+  const [sosContacts, setSosContacts] = useState<{id?:string; name:string; phone:string}[]>([]);
 
   // Load all data on mount
   useEffect(() => {
@@ -20,10 +22,12 @@ export function useCloudData() {
     let cancelled = false;
 
     const load = async () => {
-      const [profileRes, moodsRes, progressRes] = await Promise.all([
+      const [profileRes, moodsRes, progressRes, diaryRes, contactsRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).single(),
         supabase.from("mood_logs").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100),
         supabase.from("user_progress").select("*").eq("id", user.id).single(),
+        supabase.from("diary_entries").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
+        supabase.from("sos_contacts").select("*").eq("user_id", user.id).order("created_at", { ascending: true }),
       ]);
 
       if (cancelled) return;
@@ -48,6 +52,14 @@ export function useCloudData() {
         setStreakCount(progressRes.data.streak_count || 0);
         setCompletedQuests((progressRes.data.completed_quests as string[]) || []);
         setLastCheckinDate(progressRes.data.last_checkin_date || null);
+      }
+
+      if (diaryRes.data) {
+        setDiaryEntries(diaryRes.data);
+      }
+
+      if (contactsRes.data) {
+        setSosContacts(contactsRes.data.map((c: any) => ({ id: c.id, name: c.name, phone: c.phone })));
       }
 
       setLoading(false);
@@ -99,10 +111,42 @@ export function useCloudData() {
     }
   }, [user]);
 
+  const saveDiaryEntry = useCallback(async (content: string, moodTag?: string) => {
+    if (!user || !content.trim()) return;
+    const { data } = await supabase.from("diary_entries").insert({
+      user_id: user.id,
+      content,
+      mood_tag: moodTag || null,
+    }).select().single();
+    if (data) {
+      setDiaryEntries(prev => [data, ...prev]);
+    }
+    return data;
+  }, [user]);
+
+  const saveSosContacts = useCallback(async (contacts: {id?:string; name:string; phone:string}[]) => {
+    if (!user) return;
+    // Delete all existing contacts and re-insert
+    await supabase.from("sos_contacts").delete().eq("user_id", user.id);
+    const validContacts = contacts.filter(c => c.name.trim() || c.phone.trim());
+    if (validContacts.length > 0) {
+      const { data } = await supabase.from("sos_contacts").insert(
+        validContacts.map(c => ({ user_id: user.id, name: c.name, phone: c.phone }))
+      ).select();
+      if (data) {
+        setSosContacts(data.map((c: any) => ({ id: c.id, name: c.name, phone: c.phone })));
+      }
+    } else {
+      setSosContacts([]);
+    }
+  }, [user]);
+
   return {
     loading, moodLog, xp, streakCount, completedQuests,
     equippedSkin, userName, profile, lastCheckinDate,
+    diaryEntries, sosContacts,
     updateName, updateSkin, logMood, updateProgress,
+    saveDiaryEntry, saveSosContacts,
     setMoodLog, setXp, setStreakCount, setCompletedQuests,
   };
 }

@@ -85,7 +85,7 @@ const REASONS=[
 const audioCache = new Map<string, string>();
 
 // ── SPEECH PLAYER ──
-function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: string; speechId: string; emotion: string}) {
+function SpeechPlayer({text, label, speechId, emotion, onComplete}: {text: string; label: string; speechId: string; emotion: string; onComplete?:()=>void}) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -112,7 +112,7 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
       setLoading(false);
     }
     const audio = new Audio(audioUrl); audioRef.current = audio;
-    audio.onended = () => setPlaying(false); audio.onerror = () => setPlaying(false);
+    audio.onended = () => { setPlaying(false); onComplete?.(); }; audio.onerror = () => setPlaying(false);
     setPlaying(true); audio.play();
   };
   useEffect(() => { return () => { audioRef.current?.pause(); window.speechSynthesis.cancel(); }; }, []);
@@ -126,8 +126,9 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
 }
 
 // ── BREATHING ──
-function BreathingExercise({type="box"}: {type?: string}) {
+function BreathingExercise({type="box", onComplete}: {type?: string; onComplete?:()=>void}) {
   const [active, setActive] = useState(false);
+  const [completed, setCompleted] = useState(false);
   const [phase, setPhase] = useState("ready");
   const [count, setCount] = useState(0);
   const timerRef = useRef<any>(null);
@@ -138,10 +139,11 @@ function BreathingExercise({type="box"}: {type?: string}) {
   };
   const pat = patterns[type] || patterns.box;
   const stop = useCallback(() => {clearInterval(timerRef.current);setActive(false);setPhase("ready");setCount(0);phaseRef.current=0}, []);
+  const cyclesRef = useRef(0);
   const start = () => {
-    if(active){stop();return} setActive(true);phaseRef.current=0;
+    if(active){stop();return} setActive(true);phaseRef.current=0;cyclesRef.current=0;
     const p=pat.phases[0];setPhase(p.label);setCount(p.dur);let c=p.dur;
-    timerRef.current=setInterval(()=>{c--;if(c<=0){phaseRef.current=(phaseRef.current+1)%pat.phases.length;const np=pat.phases[phaseRef.current];setPhase(np.label);c=np.dur;setCount(np.dur)}else setCount(c)},1000);
+    timerRef.current=setInterval(()=>{c--;if(c<=0){phaseRef.current=(phaseRef.current+1)%pat.phases.length;if(phaseRef.current===0){cyclesRef.current++;if(cyclesRef.current>=3&&!completed){setCompleted(true);onComplete?.()}}const np=pat.phases[phaseRef.current];setPhase(np.label);c=np.dur;setCount(np.dur)}else setCount(c)},1000);
   };
   useEffect(()=>()=>clearInterval(timerRef.current),[]);
   const cp = active ? pat.phases[phaseRef.current] : null;
@@ -448,7 +450,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
   // Mood distribution pie data
   const counts: Record<string, number> = {};
   const filteredLogs = range === "week"
-    ? moodLog.filter(l => { const d = new Date(); d.setDate(d.getDate() - 7); return new Date(l.ts.replace(/(\d+)\.\s*(\d+)\.\s*(\d+)/, '$3-$2-$1')) >= d || true; })
+    ? moodLog.filter(l => { const d = new Date(); d.setDate(d.getDate() - 7); return new Date(l.ts.replace(/(\d+)\.\s*(\d+)\.\s*(\d+)/, '$3-$2-$1')) >= d; })
     : moodLog;
   filteredLogs.forEach((l: any) => { counts[l.mood.id] = (counts[l.mood.id] || 0) + 1; });
   const pieData = Object.entries(counts)
@@ -564,10 +566,11 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
 }
 
 // ── PROFILE TAB (with Mood Insights) ──
-function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void}) {
+function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut, diaryEntries, sosContacts, onSaveDiary, onSaveContacts, onCompleteQuest}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void; diaryEntries:any[]; sosContacts:{id?:string;name:string;phone:string}[]; onSaveDiary:(content:string)=>void; onSaveContacts:(contacts:{id?:string;name:string;phone:string}[])=>void; onCompleteQuest:(id:string)=>void}) {
   const [activeSection, setActiveSection] = useState("overview");
-  const [contacts, setContacts] = useState([{name:"",phone:""}]);
+  const [contacts, setContacts] = useState<{id?:string;name:string;phone:string}[]>(sosContacts.length > 0 ? sosContacts : [{name:"",phone:""}]);
   const [diary, setDiary] = useState("");
+  const [diarySaved, setDiarySaved] = useState(false);
   const days = ["Po","Út","St","Čt","Pá","So","Ne"];
 
   // Build calendar based on actual dates, not mood log index
@@ -683,7 +686,8 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
               <input value={c.phone} onChange={(e)=>{const n=[...contacts];n[i].phone=e.target.value;setContacts(n)}} placeholder="Telefon" style={{width:120,padding:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.t1,fontSize:13,fontFamily:"inherit"}}/>
             </div>
           ))}
-          <button onClick={()=>setContacts(p=>[...p,{name:"",phone:""}])} style={{padding:"8px 16px",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.accent,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:16}}>+ Přidat kontakt</button>
+          <button onClick={()=>setContacts(p=>[...p,{name:"",phone:""}])} style={{padding:"8px 16px",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.accent,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginRight:8}}>+ Přidat</button>
+          <button onClick={()=>{onSaveContacts(contacts)}} style={{padding:"8px 16px",background:T.tealDim,border:`1px solid ${T.teal}30`,borderRadius:10,color:T.teal,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:16}}>💾 Uložit</button>
           <div style={{padding:14,background:T.redDim,border:`1px solid ${T.red}20`,borderRadius:14}}>
             <div style={{color:T.red,fontSize:15,fontWeight:800}}>📞 Linka bezpečí: 116 111</div>
             <div style={{color:T.t2,fontSize:12}}>Nonstop, zdarma, anonymně</div>
@@ -696,7 +700,21 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
             <span>🔒</span><span style={{color:T.t2,fontSize:13}}>Jen pro tebe. Nikdo jiný to neuvidí.</span>
           </div>
-          <textarea value={diary} onChange={(e)=>setDiary(e.target.value)} rows={12} placeholder="Vysyp hlavu... co ti běží hlavou?" style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,padding:16,fontSize:14,fontFamily:"inherit",resize:"none",lineHeight:1.7}}/>
+          <textarea value={diary} onChange={(e)=>setDiary(e.target.value)} rows={8} placeholder="Vysyp hlavu... co ti běží hlavou?" style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,padding:16,fontSize:14,fontFamily:"inherit",resize:"none",lineHeight:1.7}}/>
+          <button onClick={()=>{if(diary.trim()){onSaveDiary(diary);onCompleteQuest("diary");setDiary("");setDiarySaved(true);setTimeout(()=>setDiarySaved(false),2000)}}} style={{marginTop:8,padding:"10px 24px",background:T.tealDim,border:`1px solid ${T.teal}30`,borderRadius:10,color:T.teal,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+            {diarySaved ? "✓ Uloženo!" : "💾 Uložit zápis"}
+          </button>
+          {diaryEntries.length > 0 && (
+            <div style={{marginTop:16}}>
+              <div style={{color:T.t1,fontSize:14,fontWeight:700,marginBottom:8}}>Předchozí zápisky</div>
+              {diaryEntries.slice(0,10).map((e:any,i:number) => (
+                <div key={e.id||i} style={{padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,marginBottom:8}}>
+                  <div style={{color:T.t2,fontSize:11,marginBottom:4}}>{new Date(e.created_at).toLocaleString("cs-CZ")}</div>
+                  <div style={{color:T.t1,fontSize:13,lineHeight:1.5}}>{e.content}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -792,6 +810,7 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicError, setMusicError] = useState<string|null>(null);
   const musicAudioRef = useRef<HTMLAudioElement|null>(null);
+  const abortRef = useRef<AbortController|null>(null);
 
   const pickRandomSpeech = () => {
     const s = SOS_SPEECHES[Math.floor(Math.random() * SOS_SPEECHES.length)];
@@ -823,6 +842,8 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
       sad:   { freqs: [196, 233, 294], type: "triangle", lfoRate: 0.08, filterFreq: 600 },
       happy: { freqs: [262, 330, 392, 523], type: "sine", lfoRate: 0.2, filterFreq: 2000 },
       metal: { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
+      lofi:  { freqs: [196, 247, 294, 370], type: "triangle", lfoRate: 0.05, filterFreq: 500 },
+      rage:  { freqs: [82, 123, 165], type: "sawtooth", lfoRate: 0.5, filterFreq: 1800 },
     };
     const cfg = configs[genre.id] || configs.calm;
 
@@ -863,16 +884,20 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
 
   const playMusic = async (genre: typeof SOS_MUSIC_GENRES[0]) => {
     if (musicAudioRef.current) { musicAudioRef.current.pause(); musicAudioRef.current = null; }
+    if (abortRef.current) { abortRef.current.abort(); }
     stopWebAudio();
     setMusicGenre(genre);
     setMusicLoading(true);
     setMusicPlaying(false);
     setMusicError(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-music`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
         body: JSON.stringify({ prompt: genre.prompt, duration: 22 }),
+        signal: controller.signal,
       });
       if (!response.ok) throw new Error("Music generation failed");
       const blob = await response.blob();
@@ -1265,7 +1290,7 @@ export default function Index() {
                           </div>
                         </div>
                         <div style={{color:T.t2,fontSize:13,marginBottom:10,lineHeight:1.5}}>{s.text.substring(0,140)}...</div>
-                        <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo}/>
+                        <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo} onComplete={()=>completeQuest("speech")}/>
                       </div>
                     ))}
                   </div>
@@ -1278,7 +1303,7 @@ export default function Index() {
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Zklidni opici — dýchej</span>
                   </div>
                   <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16}}>
-                    <BreathingExercise type={recs.breathType}/>
+                    <BreathingExercise type={recs.breathType} onComplete={()=>completeQuest("breathe")}/>
                   </div>
                 </div>
 
@@ -1307,7 +1332,7 @@ export default function Index() {
                       {[{n:5,q:"Co vidíš?"},{n:4,q:"Co cítíš dotykem?"},{n:3,q:"Co slyšíš?"},{n:2,q:"Co cítíš vůní?"},{n:1,q:"Jaká chuť?"}].map(s=>
                         <div key={s.n} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                           <span style={{color:T.accent,fontSize:20,fontWeight:900}}>{s.n}</span>
-                          <input placeholder={s.q} style={{flex:1,padding:8,background:"transparent",border:`1px solid ${T.border}`,borderRadius:8,color:T.t1,fontSize:13,fontFamily:"inherit"}}/>
+                          <input placeholder={s.q} onChange={(e)=>{if(e.target.value.trim()&&s.n===1)completeQuest("grounding")}} style={{flex:1,padding:8,background:"transparent",border:`1px solid ${T.border}`,borderRadius:8,color:T.t1,fontSize:13,fontFamily:"inherit"}}/>
                         </div>
                       )}
                     </div>
@@ -1353,7 +1378,7 @@ export default function Index() {
 
         {/* ════════ PROFILE TAB ════════ */}
         {tab === "profile" && (
-          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} />
+          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} diaryEntries={cloud.diaryEntries} sosContacts={cloud.sosContacts} onSaveDiary={(content)=>cloud.saveDiaryEntry(content)} onSaveContacts={(contacts)=>cloud.saveSosContacts(contacts)} onCompleteQuest={completeQuest} />
         )}
       </div>
 
