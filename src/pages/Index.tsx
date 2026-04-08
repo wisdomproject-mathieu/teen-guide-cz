@@ -85,7 +85,7 @@ const REASONS=[
 const audioCache = new Map<string, string>();
 
 // ── SPEECH PLAYER ──
-function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: string; speechId: string; emotion: string}) {
+function SpeechPlayer({text, label, speechId, emotion, onComplete}: {text: string; label: string; speechId: string; emotion: string; onComplete?:()=>void}) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -112,7 +112,7 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
       setLoading(false);
     }
     const audio = new Audio(audioUrl); audioRef.current = audio;
-    audio.onended = () => setPlaying(false); audio.onerror = () => setPlaying(false);
+    audio.onended = () => { setPlaying(false); onComplete?.(); }; audio.onerror = () => setPlaying(false);
     setPlaying(true); audio.play();
   };
   useEffect(() => { return () => { audioRef.current?.pause(); window.speechSynthesis.cancel(); }; }, []);
