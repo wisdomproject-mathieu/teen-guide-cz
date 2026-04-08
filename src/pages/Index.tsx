@@ -185,6 +185,17 @@ const DAILY_QUESTS = [
   { id: "streak7", label: "7denní streak", desc: "Přijď 7 dní v řadě", xp: 75, icon: "⚡" },
 ];
 
+// ── WARRIOR RANKS ──
+const WARRIOR_RANKS = [
+  { id: "novacek", name: "Opičí nováček 🐒", minXp: 0, color: T.t2, desc: "Každá legenda začala tady" },
+  { id: "bojovnik", name: "Opičí bojovník ⚔️", minXp: 100, color: T.accent, desc: "Ukazuješ sílu" },
+  { id: "valecnik", name: "Opičí válečník 🛡️", minXp: 300, color: T.teal, desc: "Nic tě nezastaví" },
+  { id: "legenda", name: "Opičí legenda 👑", minXp: 750, color: "#FFD700", desc: "Jsi inspirace" },
+];
+function getWarriorRank(xp: number) {
+  return [...WARRIOR_RANKS].reverse().find(r => xp >= r.minXp) || WARRIOR_RANKS[0];
+}
+
 function QuestsTab({ xp, completedQuests, onEquipSkin, equippedSkin }: { xp: number; completedQuests: string[]; onEquipSkin: (id: string) => void; equippedSkin: string }) {
   const [view, setView] = useState<"quests" | "skins">("quests");
   const todayKey = new Date().toISOString().split("T")[0];
