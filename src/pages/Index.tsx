@@ -109,6 +109,11 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
           method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
           body: JSON.stringify({ text, emotion, intensity: intensity || 3 }),
         });
+        const contentType = response.headers.get("Content-Type") || "";
+        if (contentType.includes("application/json")) {
+          const data = await response.json();
+          if (data.fallback || data.error) throw new Error(data.error || "TTS unavailable");
+        }
         if (!response.ok) throw new Error(`TTS failed`);
         const audioBlob = await response.blob();
         audioUrl = URL.createObjectURL(audioBlob);
