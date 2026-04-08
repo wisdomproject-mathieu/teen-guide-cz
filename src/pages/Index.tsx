@@ -126,8 +126,9 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
 }
 
 // ── BREATHING ──
-function BreathingExercise({type="box"}: {type?: string}) {
+function BreathingExercise({type="box", onComplete}: {type?: string; onComplete?:()=>void}) {
   const [active, setActive] = useState(false);
+  const [completed, setCompleted] = useState(false);
   const [phase, setPhase] = useState("ready");
   const [count, setCount] = useState(0);
   const timerRef = useRef<any>(null);
@@ -138,10 +139,11 @@ function BreathingExercise({type="box"}: {type?: string}) {
   };
   const pat = patterns[type] || patterns.box;
   const stop = useCallback(() => {clearInterval(timerRef.current);setActive(false);setPhase("ready");setCount(0);phaseRef.current=0}, []);
+  const cyclesRef = useRef(0);
   const start = () => {
-    if(active){stop();return} setActive(true);phaseRef.current=0;
+    if(active){stop();return} setActive(true);phaseRef.current=0;cyclesRef.current=0;
     const p=pat.phases[0];setPhase(p.label);setCount(p.dur);let c=p.dur;
-    timerRef.current=setInterval(()=>{c--;if(c<=0){phaseRef.current=(phaseRef.current+1)%pat.phases.length;const np=pat.phases[phaseRef.current];setPhase(np.label);c=np.dur;setCount(np.dur)}else setCount(c)},1000);
+    timerRef.current=setInterval(()=>{c--;if(c<=0){phaseRef.current=(phaseRef.current+1)%pat.phases.length;if(phaseRef.current===0){cyclesRef.current++;if(cyclesRef.current>=3&&!completed){setCompleted(true);onComplete?.()}}const np=pat.phases[phaseRef.current];setPhase(np.label);c=np.dur;setCount(np.dur)}else setCount(c)},1000);
   };
   useEffect(()=>()=>clearInterval(timerRef.current),[]);
   const cp = active ? pat.phases[phaseRef.current] : null;
