@@ -201,24 +201,25 @@ function QuestsTab({ xp, completedQuests, onEquipSkin, equippedSkin }: { xp: num
   const todayKey = new Date().toISOString().split("T")[0];
   const todayCompleted = completedQuests.filter(q => q.startsWith(todayKey)).map(q => q.split(":")[1]);
 
-  const currentLevel = Math.floor(xp / 100) + 1;
-  const xpInLevel = xp % 100;
+  const rank = getWarriorRank(xp);
+  const nextRank = WARRIOR_RANKS.find(r => r.minXp > xp);
   const nextSkin = MONKEY_SKINS.find(s => s.xpNeeded > xp);
+  const rankProgress = nextRank ? ((xp - rank.minXp) / (nextRank.minXp - rank.minXp)) * 100 : 100;
 
   return (
     <div style={{ paddingTop: 8 }} className="anim-fadeUp">
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, padding: 16, background: `linear-gradient(135deg, ${T.accent}15, ${T.purple}08)`, borderRadius: 20, border: `1px solid ${T.accent}20` }}>
+      {/* Header — Warrior Rank */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, padding: 16, background: `linear-gradient(135deg, ${rank.color}15, ${T.purple}08)`, borderRadius: 20, border: `1px solid ${rank.color}20` }}>
         <img src={monkeyQuests} alt="" className="anim-monkeyBob" style={{ width: 64, height: 64, objectFit: "contain" }} />
         <div style={{ flex: 1 }}>
-          <div style={{ color: T.t1, fontSize: 20, fontWeight: 900 }}>Level {currentLevel} 🐵</div>
+          <div style={{ color: rank.color, fontSize: 18, fontWeight: 900 }}>{rank.name}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
             <div style={{ flex: 1, height: 8, background: T.card, borderRadius: 99, border: `1px solid ${T.border}`, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${xpInLevel}%`, background: `linear-gradient(90deg, ${T.accent}, ${T.teal})`, borderRadius: 99, transition: "width .5s ease" }} />
+              <div style={{ height: "100%", width: `${rankProgress}%`, background: `linear-gradient(90deg, ${rank.color}, ${nextRank?.color || "#FFD700"})`, borderRadius: 99, transition: "width .5s ease" }} />
             </div>
-            <span style={{ color: T.accent, fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{xp} XP</span>
+            <span style={{ color: rank.color, fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{xp} XP</span>
           </div>
-          {nextSkin && <div style={{ color: T.t3, fontSize: 11, marginTop: 4 }}>Další skin: {nextSkin.name} za {nextSkin.xpNeeded} XP</div>}
+          {nextRank && <div style={{ color: T.t3, fontSize: 11, marginTop: 4 }}>Další rank: {nextRank.name} za {nextRank.minXp} XP</div>}
         </div>
       </div>
 
