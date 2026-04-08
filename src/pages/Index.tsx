@@ -1427,6 +1427,24 @@ export default function Index() {
                   </div>
                 )}
 
+                {/* Share warrior card */}
+                {shareCard && (
+                  <div className="anim-fadeUp" style={{marginBottom:20,padding:20,background:`linear-gradient(135deg, ${T.accent}12, ${T.purple}12)`,border:`1px solid ${T.accent}25`,borderRadius:20,textAlign:"center"}}>
+                    <div style={{fontSize:40,marginBottom:8}}>🏆</div>
+                    <div style={{color:T.t1,fontSize:18,fontWeight:900,marginBottom:4}}>Warrior moment!</div>
+                    <div style={{color:T.accent,fontSize:14,fontWeight:700,marginBottom:8}}>„{shareCard.quote}"</div>
+                    <div style={{color:T.t2,fontSize:12,marginBottom:4}}>{shareCard.rank}</div>
+                    <div style={{color:T.t3,fontSize:11,marginBottom:12}}>{selectedMood?.label} → Silnější 💪</div>
+                    <button onClick={()=>{
+                      const text = `🐵 Monkey Mind warrior moment!\n„${shareCard.quote}"\n${shareCard.rank}\nmonkeymind.lovable.app`;
+                      if (navigator.share) { navigator.share({text}).catch(()=>{}); }
+                      else { navigator.clipboard.writeText(text); setXpPopup({xp:0,label:"Zkopírováno! 📋"}); }
+                    }} className="reason-card" style={{padding:"10px 24px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:99,color:T.accent,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                      📤 Sdílej svůj moment
+                    </button>
+                  </div>
+                )}
+
                 {/* Talk to Opičák CTA */}
                 <button onClick={()=>setTab("chat")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.teal}12, ${T.blue}08)`,border:`1px solid ${T.teal}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:10}}>
                   <img src={monkeyChat} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
