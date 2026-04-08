@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useCloudData } from "@/hooks/useCloudData";
 import Onboarding from "@/components/Onboarding";
@@ -83,6 +84,14 @@ const REASONS=[
 ];
 
 const audioCache = new Map<string, string>();
+const MAX_CACHE = 20;
+function setCachedAudio(key: string, url: string) {
+  if (audioCache.size >= MAX_CACHE) {
+    const firstKey = audioCache.keys().next().value;
+    if (firstKey) { URL.revokeObjectURL(audioCache.get(firstKey)!); audioCache.delete(firstKey); }
+  }
+  audioCache.set(key, url);
+}
 
 // ── SPEECH PLAYER ──
 function SpeechPlayer({text, label, speechId, emotion, onComplete}: {text: string; label: string; speechId: string; emotion: string; onComplete?:()=>void}) {
@@ -102,7 +111,7 @@ function SpeechPlayer({text, label, speechId, emotion, onComplete}: {text: strin
         if (!response.ok) throw new Error(`TTS failed`);
         const audioBlob = await response.blob();
         audioUrl = URL.createObjectURL(audioBlob);
-        audioCache.set(speechId, audioUrl);
+        setCachedAudio(speechId, audioUrl);
       } catch {
         setLoading(false);
         const u = new SpeechSynthesisUtterance(text); u.lang = "cs-CZ"; u.rate = 0.82;
@@ -1054,17 +1063,21 @@ export default function Index() {
   const [selectedReason, setSelectedReason] = useState<any>(null);
   const [recs, setRecs] = useState<any>(null);
 
-  // Show onboarding for new users (no name set yet)
+  // Show onboarding for new users (onboarded flag not set)
   useEffect(() => {
-    if (!cloudLoading && !userName) setShowOnboarding(true);
-  }, [cloudLoading, userName]);
+    if (!cloudLoading && cloud.profile && !cloud.profile.onboarded) setShowOnboarding(true);
+  }, [cloudLoading, cloud.profile]);
 
-  const handleOnboardingComplete = (newName: string, moodId: string) => {
+  const handleOnboardingComplete = async (newName: string, moodId: string) => {
     cloud.updateName(newName);
+    const uid = cloud.profile?.id;
+    if (uid) {
+      await supabase.from("profiles").update({ onboarded: true } as any).eq("id", uid);
+    }
     const mood = MOODS.find(m => m.id === moodId);
     if (mood) {
       setSelectedMood(mood);
-      setStep(2); // go to reason selection
+      setStep(2);
     }
     setShowOnboarding(false);
   };
@@ -1307,15 +1320,15 @@ export default function Index() {
                   </div>
                 </div>
 
-                {/* Heavy metal */}
+                {/* Heavy metal — use SOS music instead */}
                 {recs.showMetal && (
                   <div style={{marginBottom:20}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                      <img src={monkeyMusic} alt="" style={{width:28,height:28,objectFit:"contain"}} loading="lazy"/>
-                      <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Vypusť páru</span>
-                    </div>
-                    <button onClick={()=>{try{const c=new (window.AudioContext||(window as any).webkitAudioContext)();const o=c.createOscillator();const g=c.createGain();o.type="sawtooth";o.frequency.value=82+Math.random()*40;g.gain.value=0.3;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+4);g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+4)}catch(e){}}} style={{width:"100%",padding:"16px",background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,color:T.red,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>
-                      🤘 HEAVY METAL — BLAST 🔊
+                    <button onClick={()=>setShowSOS(true)} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                      <img src={monkeyMusic} alt="" style={{width:40,height:40,objectFit:"contain"}} loading="lazy"/>
+                      <div>
+                        <div style={{color:T.red,fontSize:16,fontWeight:900}}>🤘 Vypusť páru — Hudba</div>
+                        <div style={{color:T.t2,fontSize:12}}>Metal, rage a další žánry v SOS</div>
+                      </div>
                     </button>
                   </div>
                 )}
