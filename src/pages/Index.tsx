@@ -1142,6 +1142,8 @@ export default function Index() {
     }
     const mood = MOODS.find(m => m.id === moodId);
     if (mood) {
+      const tier = MOOD_TIERS.find(t => t.id === (mood as any).tier);
+      if (tier) setSelectedTier(tier);
       setSelectedMood(mood);
       setStep(2);
     }
