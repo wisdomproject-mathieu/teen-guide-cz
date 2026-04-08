@@ -1083,6 +1083,17 @@ export default function Index() {
     if (!cloudLoading && cloud.profile && !cloud.profile.onboarded) setShowOnboarding(true);
   }, [cloudLoading, cloud.profile]);
 
+  // Fetch anonymous peer echo (how many warriors felt each mood today)
+  useEffect(() => {
+    supabase.rpc("get_today_mood_counts").then(({ data }) => {
+      if (data) {
+        const counts: Record<string, number> = {};
+        (data as any[]).forEach((r: any) => { counts[r.mood_id] = Number(r.count); });
+        setPeerEcho(counts);
+      }
+    });
+  }, [moodLog.length]);
+
   const handleOnboardingComplete = async (newName: string, moodId: string) => {
     cloud.updateName(newName);
     const uid = cloud.profile?.id;
