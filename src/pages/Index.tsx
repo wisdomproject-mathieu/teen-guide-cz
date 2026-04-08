@@ -1201,7 +1201,8 @@ export default function Index() {
     if (newStreak >= 3) completeQuest("streak3");
     if (newStreak >= 7) completeQuest("streak7");
   };
-  const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); setIntensity(3); setShareCard(null); };
+  const confirmSubMood = () => { setStep(3); };
+  const resetFlow = () => { setStep(1); setSelectedTier(null); setSelectedMood(null); setSelectedReason(null); setRecs(null); setIntensity(3); setShareCard(null); };
 
   const handleSpeechComplete = (speech: any) => {
     completeQuest("speech");
