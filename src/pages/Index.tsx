@@ -564,10 +564,11 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
 }
 
 // ── PROFILE TAB (with Mood Insights) ──
-function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void}) {
+function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut, diaryEntries, sosContacts, onSaveDiary, onSaveContacts, onCompleteQuest}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void; diaryEntries:any[]; sosContacts:{id?:string;name:string;phone:string}[]; onSaveDiary:(content:string)=>void; onSaveContacts:(contacts:{id?:string;name:string;phone:string}[])=>void; onCompleteQuest:(id:string)=>void}) {
   const [activeSection, setActiveSection] = useState("overview");
-  const [contacts, setContacts] = useState([{name:"",phone:""}]);
+  const [contacts, setContacts] = useState<{id?:string;name:string;phone:string}[]>(sosContacts.length > 0 ? sosContacts : [{name:"",phone:""}]);
   const [diary, setDiary] = useState("");
+  const [diarySaved, setDiarySaved] = useState(false);
   const days = ["Po","Út","St","Čt","Pá","So","Ne"];
 
   // Build calendar based on actual dates, not mood log index
@@ -683,7 +684,8 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
               <input value={c.phone} onChange={(e)=>{const n=[...contacts];n[i].phone=e.target.value;setContacts(n)}} placeholder="Telefon" style={{width:120,padding:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.t1,fontSize:13,fontFamily:"inherit"}}/>
             </div>
           ))}
-          <button onClick={()=>setContacts(p=>[...p,{name:"",phone:""}])} style={{padding:"8px 16px",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.accent,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:16}}>+ Přidat kontakt</button>
+          <button onClick={()=>setContacts(p=>[...p,{name:"",phone:""}])} style={{padding:"8px 16px",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.accent,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginRight:8}}>+ Přidat</button>
+          <button onClick={()=>{onSaveContacts(contacts)}} style={{padding:"8px 16px",background:T.tealDim,border:`1px solid ${T.teal}30`,borderRadius:10,color:T.teal,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:16}}>💾 Uložit</button>
           <div style={{padding:14,background:T.redDim,border:`1px solid ${T.red}20`,borderRadius:14}}>
             <div style={{color:T.red,fontSize:15,fontWeight:800}}>📞 Linka bezpečí: 116 111</div>
             <div style={{color:T.t2,fontSize:12}}>Nonstop, zdarma, anonymně</div>
@@ -696,7 +698,21 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
             <span>🔒</span><span style={{color:T.t2,fontSize:13}}>Jen pro tebe. Nikdo jiný to neuvidí.</span>
           </div>
-          <textarea value={diary} onChange={(e)=>setDiary(e.target.value)} rows={12} placeholder="Vysyp hlavu... co ti běží hlavou?" style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,padding:16,fontSize:14,fontFamily:"inherit",resize:"none",lineHeight:1.7}}/>
+          <textarea value={diary} onChange={(e)=>setDiary(e.target.value)} rows={8} placeholder="Vysyp hlavu... co ti běží hlavou?" style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,padding:16,fontSize:14,fontFamily:"inherit",resize:"none",lineHeight:1.7}}/>
+          <button onClick={()=>{if(diary.trim()){onSaveDiary(diary);onCompleteQuest("diary");setDiary("");setDiarySaved(true);setTimeout(()=>setDiarySaved(false),2000)}}} style={{marginTop:8,padding:"10px 24px",background:T.tealDim,border:`1px solid ${T.teal}30`,borderRadius:10,color:T.teal,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+            {diarySaved ? "✓ Uloženo!" : "💾 Uložit zápis"}
+          </button>
+          {diaryEntries.length > 0 && (
+            <div style={{marginTop:16}}>
+              <div style={{color:T.t1,fontSize:14,fontWeight:700,marginBottom:8}}>Předchozí zápisky</div>
+              {diaryEntries.slice(0,10).map((e:any,i:number) => (
+                <div key={e.id||i} style={{padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,marginBottom:8}}>
+                  <div style={{color:T.t2,fontSize:11,marginBottom:4}}>{new Date(e.created_at).toLocaleString("cs-CZ")}</div>
+                  <div style={{color:T.t1,fontSize:13,lineHeight:1.5}}>{e.content}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
