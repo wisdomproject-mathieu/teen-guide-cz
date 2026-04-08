@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useCloudData } from "@/hooks/useCloudData";
+import { usePremium } from "@/hooks/usePremium";
 import Onboarding from "@/components/Onboarding";
 import InAppNotifications from "@/components/InAppNotifications";
+import PaywallOverlay from "@/components/PaywallOverlay";
 import { useAuth } from "@/hooks/useAuth";
 import { getRecommendations } from "@/data/speeches";
 import monkeyHero from "@/assets/monkey-hero.png";
@@ -593,7 +595,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
 }
 
 // ── PROFILE TAB (with Mood Insights) ──
-function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut, diaryEntries, sosContacts, onSaveDiary, onSaveContacts, onCompleteQuest}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void; diaryEntries:any[]; sosContacts:{id?:string;name:string;phone:string}[]; onSaveDiary:(content:string)=>void; onSaveContacts:(contacts:{id?:string;name:string;phone:string}[])=>void; onCompleteQuest:(id:string)=>void}) {
+function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut, diaryEntries, sosContacts, onSaveDiary, onSaveContacts, onCompleteQuest, isPremium, onUpgrade}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void; diaryEntries:any[]; sosContacts:{id?:string;name:string;phone:string}[]; onSaveDiary:(content:string)=>void; onSaveContacts:(contacts:{id?:string;name:string;phone:string}[])=>void; onCompleteQuest:(id:string)=>void; isPremium:boolean; onUpgrade:()=>void}) {
   const [activeSection, setActiveSection] = useState("overview");
   const [contacts, setContacts] = useState<{id?:string;name:string;phone:string}[]>(sosContacts.length > 0 ? sosContacts : [{name:"",phone:""}]);
   const [diary, setDiary] = useState("");
@@ -734,12 +736,27 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
           {diaryEntries.length > 0 && (
             <div style={{marginTop:16}}>
               <div style={{color:T.t1,fontSize:14,fontWeight:700,marginBottom:8}}>Předchozí zápisky</div>
-              {diaryEntries.slice(0,10).map((e:any,i:number) => (
-                <div key={e.id||i} style={{padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,marginBottom:8}}>
-                  <div style={{color:T.t2,fontSize:11,marginBottom:4}}>{new Date(e.created_at).toLocaleString("cs-CZ")}</div>
-                  <div style={{color:T.t1,fontSize:13,lineHeight:1.5}}>{e.content}</div>
-                </div>
-              ))}
+              {(() => {
+                // Free users: only entries from last 7 days
+                const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+                const visibleEntries = isPremium ? diaryEntries : diaryEntries.filter((e: any) => new Date(e.created_at) >= sevenDaysAgo);
+                const hiddenCount = diaryEntries.length - visibleEntries.length;
+                return (
+                  <>
+                    {visibleEntries.slice(0,10).map((e:any,i:number) => (
+                      <div key={e.id||i} style={{padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,marginBottom:8}}>
+                        <div style={{color:T.t2,fontSize:11,marginBottom:4}}>{new Date(e.created_at).toLocaleString("cs-CZ")}</div>
+                        <div style={{color:T.t1,fontSize:13,lineHeight:1.5}}>{e.content}</div>
+                      </div>
+                    ))}
+                    {hiddenCount > 0 && (
+                      <button onClick={onUpgrade} style={{width:"100%",padding:14,background:`${T.accent}08`,border:`1px dashed ${T.accent}40`,borderRadius:12,color:T.accent,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>
+                        🔒 +{hiddenCount} starších zápisů · Odemkni Premium
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -1067,11 +1084,14 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
 export default function Index() {
   const { signOut } = useAuth();
   const cloud = useCloudData();
+  const premium = usePremium();
   const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName, lastCheckinDate, loading: cloudLoading } = cloud;
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [tab, setTab] = useState("feel");
   const [showSOS, setShowSOS] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState("");
   const [avatar, setAvatar] = useState<string|null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [xpPopup, setXpPopup] = useState<{xp:number;label:string}|null>(null);
@@ -1083,6 +1103,13 @@ export default function Index() {
   const [peerEcho, setPeerEcho] = useState<Record<string, number>>({});
   const [shareCard, setShareCard] = useState<{quote:string;rank:string;mood:string}|null>(null);
   const [recs, setRecs] = useState<any>(null);
+
+  const requirePremium = (feature: string) => {
+    if (premium.isPremium) return false;
+    setPaywallFeature(feature);
+    setShowPaywall(true);
+    return true;
+  };
 
   // Show onboarding for new users (onboarded flag not set)
   useEffect(() => {
@@ -1233,10 +1260,22 @@ export default function Index() {
       `}</style>
       <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatar} style={{display:"none"}}/>
       {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)}/>}
+      {showPaywall && <PaywallOverlay onClose={()=>setShowPaywall(false)} premium={premium} feature={paywallFeature} />}
       {xpPopup && <XpPopup xp={xpPopup.xp} label={xpPopup.label} onDone={() => setXpPopup(null)} />}
       {levelUp && <LevelUpOverlay level={levelUp.level} skin={levelUp.skin} onDone={() => setLevelUp(null)} />}
 
       <div style={{flex:1,overflowY:"auto",padding:"0 16px 16px",display:"flex",flexDirection:"column"}}>
+        {/* Trial banner */}
+        {premium.isTrial && (
+          <div style={{padding:"8px 16px",background:`linear-gradient(90deg, ${T.accent}20, ${T.purple}15)`,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between",margin:"8px 0"}}>
+            <div style={{color:T.accent,fontSize:12,fontWeight:700}}>👑 Premium trial · {premium.trialDaysLeft} dní zbývá</div>
+          </div>
+        )}
+        {premium.status === "expired" && (
+          <button onClick={()=>requirePremium("Premium")} style={{padding:"10px 16px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:12,color:T.accent,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",margin:"8px 0",textAlign:"center"}}>
+            ⏰ Trial skončil — odemkni Premium za 99 CZK/měs
+          </button>
+        )}
         {/* ════════ FEEL TAB ════════ */}
         {tab === "feel" && (
           <div>
@@ -1376,7 +1415,7 @@ export default function Index() {
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Řeč pro tebe</span>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                    {recs.speeches.map((s: any) => (
+                    {(premium.isPremium ? recs.speeches : recs.speeches.slice(0,1)).map((s: any) => (
                       <div key={s.id} className="speech-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                           <span style={{fontSize:22}}>{s.icon}</span>
@@ -1389,6 +1428,15 @@ export default function Index() {
                         <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo} intensity={intensity} onComplete={()=>handleSpeechComplete(s)}/>
                       </div>
                     ))}
+                    {!premium.isPremium && recs.speeches.length > 1 && (
+                      <button onClick={()=>requirePremium("Plná knihovna řečí")} className="reason-card" style={{display:"flex",alignItems:"center",gap:12,padding:16,background:`${T.accent}08`,border:`1px dashed ${T.accent}40`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                        <span style={{fontSize:28}}>🔒</span>
+                        <div>
+                          <div style={{color:T.accent,fontSize:14,fontWeight:800}}>+{recs.speeches.length - 1} dalších řečí</div>
+                          <div style={{color:T.t2,fontSize:12}}>Odemkni Premium pro přístup ke všem</div>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1454,11 +1502,11 @@ export default function Index() {
                 )}
 
                 {/* Talk to Opičák CTA */}
-                <button onClick={()=>setTab("chat")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.teal}12, ${T.blue}08)`,border:`1px solid ${T.teal}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:10}}>
+                <button onClick={()=>{ if (!requirePremium("Opičák AI chat")) setTab("chat"); }} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.teal}12, ${T.blue}08)`,border:`1px solid ${T.teal}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:10}}>
                   <img src={monkeyChat} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
                   <div>
-                    <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Chceš si promluvit? 🐵</div>
-                    <div style={{color:T.t2,fontSize:12}}>Opičák ti pomůže — pokecej s ním</div>
+                    <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Chceš si promluvit? {premium.isPremium ? "🐵" : "👑"}</div>
+                    <div style={{color:T.t2,fontSize:12}}>{premium.isPremium ? "Opičák ti pomůže — pokecej s ním" : "Premium · Odemkni AI chat"}</div>
                   </div>
                 </button>
 
@@ -1485,14 +1533,23 @@ export default function Index() {
         )}
 
         {/* ════════ CHAT TAB ════════ */}
-        {tab === "chat" && <MonkeyChat />}
+        {tab === "chat" && (premium.isPremium ? <MonkeyChat /> : (
+          <div className="anim-fadeUp" style={{textAlign:"center",padding:"40px 16px"}}>
+            <img src={monkeyChat} alt="" className="anim-float" style={{width:80,height:80,objectFit:"contain",margin:"0 auto 16px"}} />
+            <div style={{color:T.t1,fontSize:20,fontWeight:900,marginBottom:8}}>Opičák je Premium 👑</div>
+            <div style={{color:T.t2,fontSize:14,lineHeight:1.6,marginBottom:20}}>AI chat má provozní náklady — je součástí Premium plánu. Zkus 7 dní zdarma!</div>
+            <button onClick={()=>requirePremium("Opičák AI chat")} style={{padding:"14px 32px",background:`linear-gradient(135deg, ${T.accent}, #FF9A5C)`,border:"none",borderRadius:14,color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 0 20px ${T.accent}40`}}>
+              Odemknout Opičáka 🐵
+            </button>
+          </div>
+        ))}
 
         {/* ════════ QUESTS TAB ════════ */}
         {tab === "quests" && <QuestsTab xp={xp} completedQuests={completedQuests} onEquipSkin={equipSkin} equippedSkin={equippedSkin} />}
 
         {/* ════════ PROFILE TAB ════════ */}
         {tab === "profile" && (
-          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} diaryEntries={cloud.diaryEntries} sosContacts={cloud.sosContacts} onSaveDiary={(content)=>cloud.saveDiaryEntry(content)} onSaveContacts={(contacts)=>cloud.saveSosContacts(contacts)} onCompleteQuest={completeQuest} />
+          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} diaryEntries={cloud.diaryEntries} sosContacts={cloud.sosContacts} onSaveDiary={(content)=>cloud.saveDiaryEntry(content)} onSaveContacts={(contacts)=>cloud.saveSosContacts(contacts)} onCompleteQuest={completeQuest} isPremium={premium.isPremium} onUpgrade={()=>requirePremium("Plný deník & historie")} />
         )}
       </div>
 
