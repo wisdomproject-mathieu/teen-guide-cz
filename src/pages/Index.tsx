@@ -448,7 +448,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
   // Mood distribution pie data
   const counts: Record<string, number> = {};
   const filteredLogs = range === "week"
-    ? moodLog.filter(l => { const d = new Date(); d.setDate(d.getDate() - 7); return new Date(l.ts.replace(/(\d+)\.\s*(\d+)\.\s*(\d+)/, '$3-$2-$1')) >= d || true; })
+    ? moodLog.filter(l => { const d = new Date(); d.setDate(d.getDate() - 7); return new Date(l.ts.replace(/(\d+)\.\s*(\d+)\.\s*(\d+)/, '$3-$2-$1')) >= d; })
     : moodLog;
   filteredLogs.forEach((l: any) => { counts[l.mood.id] = (counts[l.mood.id] || 0) + 1; });
   const pieData = Object.entries(counts)
@@ -823,6 +823,8 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
       sad:   { freqs: [196, 233, 294], type: "triangle", lfoRate: 0.08, filterFreq: 600 },
       happy: { freqs: [262, 330, 392, 523], type: "sine", lfoRate: 0.2, filterFreq: 2000 },
       metal: { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
+      lofi:  { freqs: [196, 247, 294, 370], type: "triangle", lfoRate: 0.05, filterFreq: 500 },
+      rage:  { freqs: [82, 123, 165], type: "sawtooth", lfoRate: 0.5, filterFreq: 1800 },
     };
     const cfg = configs[genre.id] || configs.calm;
 
