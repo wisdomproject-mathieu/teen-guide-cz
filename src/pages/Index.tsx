@@ -810,6 +810,7 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicError, setMusicError] = useState<string|null>(null);
   const musicAudioRef = useRef<HTMLAudioElement|null>(null);
+  const abortRef = useRef<AbortController|null>(null);
 
   const pickRandomSpeech = () => {
     const s = SOS_SPEECHES[Math.floor(Math.random() * SOS_SPEECHES.length)];
@@ -883,16 +884,20 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
 
   const playMusic = async (genre: typeof SOS_MUSIC_GENRES[0]) => {
     if (musicAudioRef.current) { musicAudioRef.current.pause(); musicAudioRef.current = null; }
+    if (abortRef.current) { abortRef.current.abort(); }
     stopWebAudio();
     setMusicGenre(genre);
     setMusicLoading(true);
     setMusicPlaying(false);
     setMusicError(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-music`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
         body: JSON.stringify({ prompt: genre.prompt, duration: 22 }),
+        signal: controller.signal,
       });
       if (!response.ok) throw new Error("Music generation failed");
       const blob = await response.blob();
