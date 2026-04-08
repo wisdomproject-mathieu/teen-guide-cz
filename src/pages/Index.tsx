@@ -1070,11 +1070,8 @@ export default function Index() {
 
   const handleOnboardingComplete = async (newName: string, moodId: string) => {
     cloud.updateName(newName);
-    // Mark as onboarded in the database
-    const { user } = await import("@/integrations/supabase/client").then(m => ({ user: null }));
     const uid = cloud.profile?.id;
     if (uid) {
-      const { supabase } = await import("@/integrations/supabase/client");
       await supabase.from("profiles").update({ onboarded: true } as any).eq("id", uid);
     }
     const mood = MOODS.find(m => m.id === moodId);
