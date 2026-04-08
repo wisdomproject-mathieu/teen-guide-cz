@@ -10,3 +10,4 @@ Domain: mymonkeymind.app
 ## Memories
 - [User language](mem://~user) — Speak English, app is Czech
 - [App structure](mem://features/structure) — Auth, 4 tabs, cloud DB tables, hooks, XP/skins system
+- [Strategy 2025](mem://features/strategy) — 10-feature roadmap, intensity matching, warrior ranks, peer echo, share cards

@@ -94,24 +94,25 @@ function setCachedAudio(key: string, url: string) {
 }
 
 // ── SPEECH PLAYER ──
-function SpeechPlayer({text, label, speechId, emotion, onComplete}: {text: string; label: string; speechId: string; emotion: string; onComplete?:()=>void}) {
+function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {text: string; label: string; speechId: string; emotion: string; intensity?: number; onComplete?:()=>void}) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const play = async () => {
     if (playing) { audioRef.current?.pause(); setPlaying(false); return; }
-    let audioUrl = audioCache.get(speechId);
+    const cacheKey = `${speechId}-i${intensity||3}`;
+    let audioUrl = audioCache.get(cacheKey);
     if (!audioUrl) {
       setLoading(true);
       try {
         const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
           method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-          body: JSON.stringify({ text, emotion }),
+          body: JSON.stringify({ text, emotion, intensity: intensity || 3 }),
         });
         if (!response.ok) throw new Error(`TTS failed`);
         const audioBlob = await response.blob();
         audioUrl = URL.createObjectURL(audioBlob);
-        setCachedAudio(speechId, audioUrl);
+        setCachedAudio(cacheKey, audioUrl);
       } catch {
         setLoading(false);
         const u = new SpeechSynthesisUtterance(text); u.lang = "cs-CZ"; u.rate = 0.82;
@@ -185,29 +186,41 @@ const DAILY_QUESTS = [
   { id: "streak7", label: "7denní streak", desc: "Přijď 7 dní v řadě", xp: 75, icon: "⚡" },
 ];
 
+// ── WARRIOR RANKS ──
+const WARRIOR_RANKS = [
+  { id: "novacek", name: "Opičí nováček 🐒", minXp: 0, color: T.t2, desc: "Každá legenda začala tady" },
+  { id: "bojovnik", name: "Opičí bojovník ⚔️", minXp: 100, color: T.accent, desc: "Ukazuješ sílu" },
+  { id: "valecnik", name: "Opičí válečník 🛡️", minXp: 300, color: T.teal, desc: "Nic tě nezastaví" },
+  { id: "legenda", name: "Opičí legenda 👑", minXp: 750, color: "#FFD700", desc: "Jsi inspirace" },
+];
+function getWarriorRank(xp: number) {
+  return [...WARRIOR_RANKS].reverse().find(r => xp >= r.minXp) || WARRIOR_RANKS[0];
+}
+
 function QuestsTab({ xp, completedQuests, onEquipSkin, equippedSkin }: { xp: number; completedQuests: string[]; onEquipSkin: (id: string) => void; equippedSkin: string }) {
   const [view, setView] = useState<"quests" | "skins">("quests");
   const todayKey = new Date().toISOString().split("T")[0];
   const todayCompleted = completedQuests.filter(q => q.startsWith(todayKey)).map(q => q.split(":")[1]);
 
-  const currentLevel = Math.floor(xp / 100) + 1;
-  const xpInLevel = xp % 100;
+  const rank = getWarriorRank(xp);
+  const nextRank = WARRIOR_RANKS.find(r => r.minXp > xp);
   const nextSkin = MONKEY_SKINS.find(s => s.xpNeeded > xp);
+  const rankProgress = nextRank ? ((xp - rank.minXp) / (nextRank.minXp - rank.minXp)) * 100 : 100;
 
   return (
     <div style={{ paddingTop: 8 }} className="anim-fadeUp">
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, padding: 16, background: `linear-gradient(135deg, ${T.accent}15, ${T.purple}08)`, borderRadius: 20, border: `1px solid ${T.accent}20` }}>
+      {/* Header — Warrior Rank */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, padding: 16, background: `linear-gradient(135deg, ${rank.color}15, ${T.purple}08)`, borderRadius: 20, border: `1px solid ${rank.color}20` }}>
         <img src={monkeyQuests} alt="" className="anim-monkeyBob" style={{ width: 64, height: 64, objectFit: "contain" }} />
         <div style={{ flex: 1 }}>
-          <div style={{ color: T.t1, fontSize: 20, fontWeight: 900 }}>Level {currentLevel} 🐵</div>
+          <div style={{ color: rank.color, fontSize: 18, fontWeight: 900 }}>{rank.name}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
             <div style={{ flex: 1, height: 8, background: T.card, borderRadius: 99, border: `1px solid ${T.border}`, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${xpInLevel}%`, background: `linear-gradient(90deg, ${T.accent}, ${T.teal})`, borderRadius: 99, transition: "width .5s ease" }} />
+              <div style={{ height: "100%", width: `${rankProgress}%`, background: `linear-gradient(90deg, ${rank.color}, ${nextRank?.color || "#FFD700"})`, borderRadius: 99, transition: "width .5s ease" }} />
             </div>
-            <span style={{ color: T.accent, fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{xp} XP</span>
+            <span style={{ color: rank.color, fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{xp} XP</span>
           </div>
-          {nextSkin && <div style={{ color: T.t3, fontSize: 11, marginTop: 4 }}>Další skin: {nextSkin.name} za {nextSkin.xpNeeded} XP</div>}
+          {nextRank && <div style={{ color: T.t3, fontSize: 11, marginTop: 4 }}>Další rank: {nextRank.name} za {nextRank.minXp} XP</div>}
         </div>
       </div>
 
@@ -1061,12 +1074,26 @@ export default function Index() {
   const [step, setStep] = useState(1);
   const [selectedMood, setSelectedMood] = useState<any>(null);
   const [selectedReason, setSelectedReason] = useState<any>(null);
+  const [intensity, setIntensity] = useState(3);
+  const [peerEcho, setPeerEcho] = useState<Record<string, number>>({});
+  const [shareCard, setShareCard] = useState<{quote:string;rank:string;mood:string}|null>(null);
   const [recs, setRecs] = useState<any>(null);
 
   // Show onboarding for new users (onboarded flag not set)
   useEffect(() => {
     if (!cloudLoading && cloud.profile && !cloud.profile.onboarded) setShowOnboarding(true);
   }, [cloudLoading, cloud.profile]);
+
+  // Fetch anonymous peer echo (how many warriors felt each mood today)
+  useEffect(() => {
+    supabase.rpc("get_today_mood_counts").then(({ data }) => {
+      if (data) {
+        const counts: Record<string, number> = {};
+        (data as any[]).forEach((r: any) => { counts[r.mood_id] = Number(r.count); });
+        setPeerEcho(counts);
+      }
+    });
+  }, [moodLog.length]);
 
   const handleOnboardingComplete = async (newName: string, moodId: string) => {
     cloud.updateName(newName);
@@ -1111,7 +1138,8 @@ export default function Index() {
   };
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
-  const selectMood = (m: any) => { setSelectedMood(m); setStep(2); };
+  const selectMood = (m: any) => { setSelectedMood(m); setIntensity(3); setStep(2); };
+  const confirmIntensity = () => { setStep(3); };
   const selectReason = (r: any) => {
     setSelectedReason(r);
     cloud.logMood(selectedMood.id, r.id);
@@ -1119,24 +1147,28 @@ export default function Index() {
     const isNewDay = lastCheckinDate !== today;
     let newStreak = streakCount;
     if (isNewDay) {
-      // Check if yesterday was the last check-in (continuing streak) or gap (reset)
       if (lastCheckinDate) {
         const lastDate = new Date(lastCheckinDate);
         const diff = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
         newStreak = diff <= 1 ? streakCount + 1 : 1;
       } else {
-        newStreak = 1; // first ever check-in
+        newStreak = 1;
       }
     }
-    // else: same day, streak stays the same
     cloud.updateProgress(xp, newStreak, completedQuests);
     setRecs(getRecommendations(selectedMood, r));
-    setStep(3);
+    setStep(4);
     completeQuest("checkin");
     if (newStreak >= 3) completeQuest("streak3");
     if (newStreak >= 7) completeQuest("streak7");
   };
-  const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); };
+  const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); setIntensity(3); setShareCard(null); };
+
+  const handleSpeechComplete = (speech: any) => {
+    completeQuest("speech");
+    const rank = getWarriorRank(xp);
+    setShareCard({ quote: speech.title, rank: rank.name, mood: selectedMood?.label || "" });
+  };
 
   const lastMoodMonkey = selectedMood ? MOOD_MONKEY[selectedMood.id] : (moodLog.length > 0 ? MOOD_MONKEY[moodLog[0].mood.id] : null);
 
@@ -1212,7 +1244,9 @@ export default function Index() {
                 <input value={userName} onChange={e=>handleNameChange(e.target.value)} placeholder="Tvoje jméno…"
                   style={{background:"transparent",border:"none",outline:"none",color:T.t1,fontFamily:"inherit",fontSize:15,fontWeight:700,width:"100%"}} />
                 <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
-                  <span style={{color:T.accent,fontSize:13,fontWeight:800}}>{streakCount} dní v řadě 🔥</span>
+                  <span style={{color:getWarriorRank(xp).color,fontSize:11,fontWeight:700}}>{getWarriorRank(xp).name}</span>
+                  <span style={{color:T.t3,fontSize:11}}>·</span>
+                  <span style={{color:T.accent,fontSize:13,fontWeight:800}}>{streakCount}🔥</span>
                 </div>
               </div>
               {lastMoodMonkey ? (
@@ -1247,14 +1281,58 @@ export default function Index() {
               </>
             )}
 
-            {/* STEP 2 — why */}
-            {step === 2 && (
+            {/* STEP 2 — intensity slider */}
+            {step === 2 && selectedMood && (
               <>
                 <button onClick={()=>{setStep(1);setSelectedMood(null)}} style={{background:"none",border:"none",color:T.t2,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12,display:"flex",alignItems:"center",gap:4}}>← Zpět</button>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
+                <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
                   <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
                   <div>
                     <div style={{color:T.t1,fontSize:15,fontWeight:700}}>Cítíš se: {selectedMood.label}</div>
+                    <div style={{color:T.t2,fontSize:12}}>Jak moc to cítíš?</div>
+                  </div>
+                </div>
+                <div className="anim-fadeUp" style={{padding:20,background:T.card,border:`1px solid ${T.border}`,borderRadius:16,marginBottom:16}}>
+                  <div style={{color:T.t1,fontSize:18,fontWeight:800,marginBottom:12,textAlign:"center"}}>Intenzita: {intensity}/5</div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+                    <span style={{color:T.t2,fontSize:20}}>😌</span>
+                    <input type="range" min={1} max={5} value={intensity} onChange={e=>setIntensity(Number(e.target.value))}
+                      style={{flex:1,accentColor:selectedMood.color,height:8,cursor:"pointer"}} />
+                    <span style={{color:T.t2,fontSize:20}}>🔥</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+                    {[1,2,3,4,5].map(n => (
+                      <button key={n} onClick={()=>setIntensity(n)}
+                        style={{width:40,height:40,borderRadius:"50%",background:intensity===n?`${selectedMood.color}30`:T.card,border:`2px solid ${intensity===n?selectedMood.color:T.border}`,color:intensity===n?selectedMood.color:T.t3,fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit",transition:"all .2s"}}>{n}</button>
+                    ))}
+                  </div>
+                  <div style={{color:T.t2,fontSize:13,textAlign:"center",marginBottom:4}}>
+                    {intensity <= 2 ? "Lehce to cítíš — jemný přístup" : intensity <= 3 ? "Střední intenzita" : intensity === 4 ? "Cítíš to silně" : "Na plný — Goggins mode 💀"}
+                  </div>
+                </div>
+                {/* Peer echo */}
+                {Object.values(peerEcho).reduce((a,b)=>a+b,0) > 0 && (
+                  <div className="anim-fadeUp anim-d2" style={{padding:12,background:`${selectedMood.color}08`,border:`1px solid ${selectedMood.color}15`,borderRadius:12,marginBottom:16,textAlign:"center"}}>
+                    <span style={{color:selectedMood.color,fontSize:14,fontWeight:700}}>
+                      {peerEcho[selectedMood.id] || 0} opičích válečníků cítí {selectedMood.label.toLowerCase()} dnes
+                    </span>
+                    <div style={{color:T.t3,fontSize:11,marginTop:2}}>Nejsi v tom sám/a 🐵</div>
+                  </div>
+                )}
+                <button onClick={confirmIntensity} className="reason-card" style={{width:"100%",padding:"14px 0",background:`linear-gradient(135deg, ${selectedMood.color}20, ${selectedMood.color}08)`,border:`1px solid ${selectedMood.color}30`,borderRadius:14,color:selectedMood.color,fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+                  Pokračuj →
+                </button>
+              </>
+            )}
+
+            {/* STEP 3 — why */}
+            {step === 3 && (
+              <>
+                <button onClick={()=>setStep(2)} style={{background:"none",border:"none",color:T.t2,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12,display:"flex",alignItems:"center",gap:4}}>← Zpět</button>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
+                  <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
+                  <div>
+                    <div style={{color:T.t1,fontSize:15,fontWeight:700}}>Cítíš se: {selectedMood.label} ({intensity}/5)</div>
                     <div style={{color:T.t2,fontSize:12}}>Co za tím stojí?</div>
                   </div>
                 </div>
@@ -1274,14 +1352,14 @@ export default function Index() {
               </>
             )}
 
-            {/* STEP 3 — tailored results (merged: speeches + breathing + tools) */}
-            {step === 3 && recs && (
+            {/* STEP 4 — tailored results */}
+            {step === 4 && recs && (
               <>
                 <button onClick={resetFlow} style={{background:"none",border:"none",color:T.accent,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12}}>← Nový check-in</button>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
                   <img src={EMO_MONKEY[recs.emo] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
                   <div>
-                    <div style={{color:T.t1,fontSize:14,fontWeight:700}}>{selectedMood.label} · {selectedReason.label}</div>
+                    <div style={{color:T.t1,fontSize:14,fontWeight:700}}>{selectedMood.label} · {selectedReason.label} · {intensity}/5</div>
                     <div style={{color:T.t2,fontSize:12}}>Opice ti vybrala tohle 👇</div>
                   </div>
                 </div>
@@ -1303,7 +1381,7 @@ export default function Index() {
                           </div>
                         </div>
                         <div style={{color:T.t2,fontSize:13,marginBottom:10,lineHeight:1.5}}>{s.text.substring(0,140)}...</div>
-                        <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo} onComplete={()=>completeQuest("speech")}/>
+                        <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo} intensity={intensity} onComplete={()=>handleSpeechComplete(s)}/>
                       </div>
                     ))}
                   </div>
@@ -1349,6 +1427,24 @@ export default function Index() {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* Share warrior card */}
+                {shareCard && (
+                  <div className="anim-fadeUp" style={{marginBottom:20,padding:20,background:`linear-gradient(135deg, ${T.accent}12, ${T.purple}12)`,border:`1px solid ${T.accent}25`,borderRadius:20,textAlign:"center"}}>
+                    <div style={{fontSize:40,marginBottom:8}}>🏆</div>
+                    <div style={{color:T.t1,fontSize:18,fontWeight:900,marginBottom:4}}>Warrior moment!</div>
+                    <div style={{color:T.accent,fontSize:14,fontWeight:700,marginBottom:8}}>„{shareCard.quote}"</div>
+                    <div style={{color:T.t2,fontSize:12,marginBottom:4}}>{shareCard.rank}</div>
+                    <div style={{color:T.t3,fontSize:11,marginBottom:12}}>{selectedMood?.label} → Silnější 💪</div>
+                    <button onClick={()=>{
+                      const text = `🐵 Monkey Mind warrior moment!\n„${shareCard.quote}"\n${shareCard.rank}\nmonkeymind.lovable.app`;
+                      if (navigator.share) { navigator.share({text}).catch(()=>{}); }
+                      else { navigator.clipboard.writeText(text); setXpPopup({xp:0,label:"Zkopírováno! 📋"}); }
+                    }} className="reason-card" style={{padding:"10px 24px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:99,color:T.accent,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                      📤 Sdílej svůj moment
+                    </button>
                   </div>
                 )}
 
