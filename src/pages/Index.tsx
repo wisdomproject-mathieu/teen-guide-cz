@@ -1177,8 +1177,8 @@ export default function Index() {
   };
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
-  const selectMood = (m: any) => { setSelectedMood(m); setIntensity(3); setStep(2); };
-  const confirmIntensity = () => { setStep(3); };
+  const selectTier = (tier: typeof MOOD_TIERS[0]) => { setSelectedTier(tier); setStep(2); };
+  const selectMood = (m: any) => { setSelectedMood(m); setIntensity(3); };
   const selectReason = (r: any) => {
     setSelectedReason(r);
     cloud.logMood(selectedMood.id, r.id);
