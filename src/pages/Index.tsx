@@ -94,24 +94,25 @@ function setCachedAudio(key: string, url: string) {
 }
 
 // ── SPEECH PLAYER ──
-function SpeechPlayer({text, label, speechId, emotion, onComplete}: {text: string; label: string; speechId: string; emotion: string; onComplete?:()=>void}) {
+function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {text: string; label: string; speechId: string; emotion: string; intensity?: number; onComplete?:()=>void}) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const play = async () => {
     if (playing) { audioRef.current?.pause(); setPlaying(false); return; }
-    let audioUrl = audioCache.get(speechId);
+    const cacheKey = `${speechId}-i${intensity||3}`;
+    let audioUrl = audioCache.get(cacheKey);
     if (!audioUrl) {
       setLoading(true);
       try {
         const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
           method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-          body: JSON.stringify({ text, emotion }),
+          body: JSON.stringify({ text, emotion, intensity: intensity || 3 }),
         });
         if (!response.ok) throw new Error(`TTS failed`);
         const audioBlob = await response.blob();
         audioUrl = URL.createObjectURL(audioBlob);
-        setCachedAudio(speechId, audioUrl);
+        setCachedAudio(cacheKey, audioUrl);
       } catch {
         setLoading(false);
         const u = new SpeechSynthesisUtterance(text); u.lang = "cs-CZ"; u.rate = 0.82;
