@@ -1103,6 +1103,7 @@ export default function Index() {
   const [xpPopup, setXpPopup] = useState<{xp:number;label:string}|null>(null);
   const [levelUp, setLevelUp] = useState<{level:number;skin?:typeof MONKEY_SKINS[0]|null}|null>(null);
   const [step, setStep] = useState(1);
+  const [selectedTier, setSelectedTier] = useState<typeof MOOD_TIERS[0]|null>(null);
   const [selectedMood, setSelectedMood] = useState<any>(null);
   const [selectedReason, setSelectedReason] = useState<any>(null);
   const [intensity, setIntensity] = useState(3);
