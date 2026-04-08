@@ -1137,7 +1137,8 @@ export default function Index() {
   };
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
-  const selectMood = (m: any) => { setSelectedMood(m); setStep(2); };
+  const selectMood = (m: any) => { setSelectedMood(m); setIntensity(3); setStep(2); };
+  const confirmIntensity = () => { setStep(3); };
   const selectReason = (r: any) => {
     setSelectedReason(r);
     cloud.logMood(selectedMood.id, r.id);
@@ -1145,24 +1146,28 @@ export default function Index() {
     const isNewDay = lastCheckinDate !== today;
     let newStreak = streakCount;
     if (isNewDay) {
-      // Check if yesterday was the last check-in (continuing streak) or gap (reset)
       if (lastCheckinDate) {
         const lastDate = new Date(lastCheckinDate);
         const diff = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
         newStreak = diff <= 1 ? streakCount + 1 : 1;
       } else {
-        newStreak = 1; // first ever check-in
+        newStreak = 1;
       }
     }
-    // else: same day, streak stays the same
     cloud.updateProgress(xp, newStreak, completedQuests);
     setRecs(getRecommendations(selectedMood, r));
-    setStep(3);
+    setStep(4);
     completeQuest("checkin");
     if (newStreak >= 3) completeQuest("streak3");
     if (newStreak >= 7) completeQuest("streak7");
   };
-  const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); };
+  const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); setIntensity(3); setShareCard(null); };
+
+  const handleSpeechComplete = (speech: any) => {
+    completeQuest("speech");
+    const rank = getWarriorRank(xp);
+    setShareCard({ quote: speech.title, rank: rank.name, mood: selectedMood?.label || "" });
+  };
 
   const lastMoodMonkey = selectedMood ? MOOD_MONKEY[selectedMood.id] : (moodLog.length > 0 ? MOOD_MONKEY[moodLog[0].mood.id] : null);
 
