@@ -736,12 +736,27 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
           {diaryEntries.length > 0 && (
             <div style={{marginTop:16}}>
               <div style={{color:T.t1,fontSize:14,fontWeight:700,marginBottom:8}}>Předchozí zápisky</div>
-              {diaryEntries.slice(0,10).map((e:any,i:number) => (
-                <div key={e.id||i} style={{padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,marginBottom:8}}>
-                  <div style={{color:T.t2,fontSize:11,marginBottom:4}}>{new Date(e.created_at).toLocaleString("cs-CZ")}</div>
-                  <div style={{color:T.t1,fontSize:13,lineHeight:1.5}}>{e.content}</div>
-                </div>
-              ))}
+              {(() => {
+                // Free users: only entries from last 7 days
+                const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+                const visibleEntries = isPremium ? diaryEntries : diaryEntries.filter((e: any) => new Date(e.created_at) >= sevenDaysAgo);
+                const hiddenCount = diaryEntries.length - visibleEntries.length;
+                return (
+                  <>
+                    {visibleEntries.slice(0,10).map((e:any,i:number) => (
+                      <div key={e.id||i} style={{padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,marginBottom:8}}>
+                        <div style={{color:T.t2,fontSize:11,marginBottom:4}}>{new Date(e.created_at).toLocaleString("cs-CZ")}</div>
+                        <div style={{color:T.t1,fontSize:13,lineHeight:1.5}}>{e.content}</div>
+                      </div>
+                    ))}
+                    {hiddenCount > 0 && (
+                      <button onClick={onUpgrade} style={{width:"100%",padding:14,background:`${T.accent}08`,border:`1px dashed ${T.accent}40`,borderRadius:12,color:T.accent,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>
+                        🔒 +{hiddenCount} starších zápisů · Odemkni Premium
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -1534,7 +1549,7 @@ export default function Index() {
 
         {/* ════════ PROFILE TAB ════════ */}
         {tab === "profile" && (
-          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} diaryEntries={cloud.diaryEntries} sosContacts={cloud.sosContacts} onSaveDiary={(content)=>cloud.saveDiaryEntry(content)} onSaveContacts={(contacts)=>cloud.saveSosContacts(contacts)} onCompleteQuest={completeQuest} />
+          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} diaryEntries={cloud.diaryEntries} sosContacts={cloud.sosContacts} onSaveDiary={(content)=>cloud.saveDiaryEntry(content)} onSaveContacts={(contacts)=>cloud.saveSosContacts(contacts)} onCompleteQuest={completeQuest} isPremium={premium.isPremium} onUpgrade={()=>requirePremium("Plný deník & historie")} />
         )}
       </div>
 
