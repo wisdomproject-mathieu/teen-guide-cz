@@ -1243,7 +1243,9 @@ export default function Index() {
                 <input value={userName} onChange={e=>handleNameChange(e.target.value)} placeholder="Tvoje jméno…"
                   style={{background:"transparent",border:"none",outline:"none",color:T.t1,fontFamily:"inherit",fontSize:15,fontWeight:700,width:"100%"}} />
                 <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
-                  <span style={{color:T.accent,fontSize:13,fontWeight:800}}>{streakCount} dní v řadě 🔥</span>
+                  <span style={{color:getWarriorRank(xp).color,fontSize:11,fontWeight:700}}>{getWarriorRank(xp).name}</span>
+                  <span style={{color:T.t3,fontSize:11}}>·</span>
+                  <span style={{color:T.accent,fontSize:13,fontWeight:800}}>{streakCount}🔥</span>
                 </div>
               </div>
               {lastMoodMonkey ? (
