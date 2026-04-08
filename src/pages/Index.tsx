@@ -1069,11 +1069,14 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
 export default function Index() {
   const { signOut } = useAuth();
   const cloud = useCloudData();
+  const premium = usePremium();
   const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName, lastCheckinDate, loading: cloudLoading } = cloud;
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [tab, setTab] = useState("feel");
   const [showSOS, setShowSOS] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState("");
   const [avatar, setAvatar] = useState<string|null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [xpPopup, setXpPopup] = useState<{xp:number;label:string}|null>(null);
@@ -1085,6 +1088,13 @@ export default function Index() {
   const [peerEcho, setPeerEcho] = useState<Record<string, number>>({});
   const [shareCard, setShareCard] = useState<{quote:string;rank:string;mood:string}|null>(null);
   const [recs, setRecs] = useState<any>(null);
+
+  const requirePremium = (feature: string) => {
+    if (premium.isPremium) return false;
+    setPaywallFeature(feature);
+    setShowPaywall(true);
+    return true;
+  };
 
   // Show onboarding for new users (onboarded flag not set)
   useEffect(() => {
