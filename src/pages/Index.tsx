@@ -60,13 +60,19 @@ const T={bg:"#0A0C13",accent:"#FF7A2F",accentDim:"rgba(255,122,47,0.12)",teal:"#
 // Speeches are in src/data/speeches.ts
 
 const MOODS=[
-  {id:"great",label:"Skvěle",sub:"Mám energii, svět je můj",color:T.teal},
-  {id:"pumped",label:"Nabitej/á",sub:"Ready na cokoliv",color:T.blue},
-  {id:"meh",label:"Tak nějak",sub:"Nic moc, nic málo",color:T.accent},
-  {id:"angry",label:"Naštvanej/á",sub:"Všechno mě sere",color:T.red},
-  {id:"sad",label:"Smutnej/á",sub:"Bolí to uvnitř",color:T.purple},
-  {id:"anxious",label:"Úzkostnej/á",sub:"Svírá mě to",color:"#FF7A2F"},
-  {id:"awful",label:"Na dně",sub:"Nevím co dál",color:T.red},
+  {id:"great",label:"Skvěle",sub:"Mám energii, svět je můj",color:T.teal,tier:"good"},
+  {id:"pumped",label:"Nabitej/á",sub:"Ready na cokoliv",color:T.blue,tier:"good"},
+  {id:"meh",label:"Tak nějak",sub:"Nic moc, nic málo",color:T.accent,tier:"ok"},
+  {id:"angry",label:"Naštvanej/á",sub:"Všechno mě sere",color:T.red,tier:"bad"},
+  {id:"sad",label:"Smutnej/á",sub:"Bolí to uvnitř",color:T.purple,tier:"bad"},
+  {id:"anxious",label:"Úzkostnej/á",sub:"Svírá mě to",color:"#FF7A2F",tier:"bad"},
+  {id:"awful",label:"Na dně",sub:"Nevím co dál",color:T.red,tier:"bad"},
+];
+
+const MOOD_TIERS = [
+  {id:"good",label:"Dobře",emoji:"😊",sub:"Mám se fajn",color:T.teal,gradient:`linear-gradient(135deg, ${T.teal}20, ${T.teal}05)`},
+  {id:"ok",label:"Tak nějak",emoji:"😐",sub:"Nic extra",color:T.accent,gradient:`linear-gradient(135deg, ${T.accent}20, ${T.accent}05)`},
+  {id:"bad",label:"Špatně",emoji:"😔",sub:"Není mi dobře",color:T.red,gradient:`linear-gradient(135deg, ${T.red}20, ${T.red}05)`},
 ];
 
 const REASON_MONKEY: Record<string, string> = {
