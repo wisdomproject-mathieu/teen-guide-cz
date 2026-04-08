@@ -1378,7 +1378,7 @@ export default function Index() {
                           </div>
                         </div>
                         <div style={{color:T.t2,fontSize:13,marginBottom:10,lineHeight:1.5}}>{s.text.substring(0,140)}...</div>
-                        <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo} onComplete={()=>completeQuest("speech")}/>
+                        <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo} onComplete={()=>handleSpeechComplete(s)}/>
                       </div>
                     ))}
                   </div>
