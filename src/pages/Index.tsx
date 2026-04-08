@@ -1128,7 +1128,7 @@ export default function Index() {
   }, [moodLog.length]);
 
   const handleOnboardingComplete = async (newName: string, moodId: string) => {
-    cloud.updateName(newName);
+    if (newName) cloud.updateName(newName);
     const uid = cloud.profile?.id;
     if (uid) {
       await supabase.from("profiles").update({ onboarded: true } as any).eq("id", uid);
@@ -1483,21 +1483,70 @@ export default function Index() {
                   </div>
                 )}
 
-                {/* Share warrior card */}
+                {/* Share warrior card — visual canvas-based */}
                 {shareCard && (
-                  <div className="anim-fadeUp" style={{marginBottom:20,padding:20,background:`linear-gradient(135deg, ${T.accent}12, ${T.purple}12)`,border:`1px solid ${T.accent}25`,borderRadius:20,textAlign:"center"}}>
-                    <div style={{fontSize:40,marginBottom:8}}>🏆</div>
-                    <div style={{color:T.t1,fontSize:18,fontWeight:900,marginBottom:4}}>Warrior moment!</div>
-                    <div style={{color:T.accent,fontSize:14,fontWeight:700,marginBottom:8}}>„{shareCard.quote}"</div>
-                    <div style={{color:T.t2,fontSize:12,marginBottom:4}}>{shareCard.rank}</div>
-                    <div style={{color:T.t3,fontSize:11,marginBottom:12}}>{selectedMood?.label} → Silnější 💪</div>
-                    <button onClick={()=>{
-                      const text = `🐵 Monkey Mind warrior moment!\n„${shareCard.quote}"\n${shareCard.rank}\nmonkeymind.lovable.app`;
-                      if (navigator.share) { navigator.share({text}).catch(()=>{}); }
-                      else { navigator.clipboard.writeText(text); setXpPopup({xp:0,label:"Zkopírováno! 📋"}); }
-                    }} className="reason-card" style={{padding:"10px 24px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:99,color:T.accent,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                      📤 Sdílej svůj moment
-                    </button>
+                  <div className="anim-fadeUp" style={{marginBottom:20}}>
+                    {/* Card preview */}
+                    <div id="warrior-card" style={{
+                      padding:24,borderRadius:24,textAlign:"center",position:"relative",overflow:"hidden",
+                      background:`linear-gradient(145deg, #1a1030 0%, #0d0f1a 40%, ${selectedMood?.color || T.accent}15 100%)`,
+                      border:`1px solid ${T.accent}30`,
+                    }}>
+                      {/* Decorative elements */}
+                      <div style={{position:"absolute",top:-20,right:-20,width:100,height:100,borderRadius:"50%",background:`radial-gradient(circle,${selectedMood?.color || T.accent}20,transparent)`,filter:"blur(20px)"}} />
+                      <div style={{position:"absolute",bottom:-30,left:-30,width:120,height:120,borderRadius:"50%",background:`radial-gradient(circle,${T.purple}15,transparent)`,filter:"blur(25px)"}} />
+                      
+                      <div style={{fontSize:14,color:T.t3,fontWeight:600,letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>🐵 Monkey Mind</div>
+                      <div style={{fontSize:32,marginBottom:8}}>⚔️</div>
+                      <div style={{color:T.t1,fontSize:22,fontWeight:900,marginBottom:6,lineHeight:1.2}}>Warrior Moment</div>
+                      <div style={{color:selectedMood?.color || T.accent,fontSize:16,fontWeight:700,marginBottom:12,fontStyle:"italic",lineHeight:1.4}}>„{shareCard.quote}"</div>
+                      
+                      {/* Mood transformation */}
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}>
+                        <div style={{padding:"6px 14px",background:`${selectedMood?.color || T.accent}15`,border:`1px solid ${selectedMood?.color || T.accent}30`,borderRadius:99}}>
+                          <span style={{color:selectedMood?.color || T.accent,fontSize:13,fontWeight:700}}>{selectedMood?.label || "?"}</span>
+                        </div>
+                        <span style={{color:T.t3,fontSize:16}}>→</span>
+                        <div style={{padding:"6px 14px",background:`${T.teal}15`,border:`1px solid ${T.teal}30`,borderRadius:99}}>
+                          <span style={{color:T.teal,fontSize:13,fontWeight:700}}>Silnější 💪</span>
+                        </div>
+                      </div>
+                      
+                      {/* Rank badge */}
+                      <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 18px",background:`${getWarriorRank(xp).color}12`,border:`1px solid ${getWarriorRank(xp).color}25`,borderRadius:99,marginBottom:8}}>
+                        <span style={{color:getWarriorRank(xp).color,fontSize:14,fontWeight:800}}>{shareCard.rank}</span>
+                      </div>
+                      
+                      <div style={{color:T.t3,fontSize:11,marginTop:8}}>monkeymind.lovable.app</div>
+                    </div>
+                    
+                    {/* Action buttons */}
+                    <div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>
+                      <button onClick={async ()=>{
+                        // Try canvas-based image share
+                        try {
+                          const el = document.getElementById("warrior-card");
+                          if (el) {
+                            // Fallback: share as text with visual indicator
+                            const text = `🐵 Monkey Mind warrior moment!\n⚔️ „${shareCard.quote}"\n${shareCard.rank}\n${selectedMood?.label} → Silnější 💪\nmonkeymind.lovable.app`;
+                            if (navigator.share) {
+                              await navigator.share({title:"Monkey Mind Warrior",text});
+                            } else {
+                              await navigator.clipboard.writeText(text);
+                              setXpPopup({xp:0,label:"Zkopírováno! 📋"});
+                            }
+                          }
+                        } catch { /* user cancelled */ }
+                      }} className="reason-card" style={{padding:"12px 28px",background:`linear-gradient(135deg, ${T.accent}20, ${T.accent}08)`,border:`1px solid ${T.accent}40`,borderRadius:99,color:T.accent,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                        📤 Sdílej na sítě
+                      </button>
+                      <button onClick={()=>{
+                        const text = `🐵 „${shareCard.quote}" · ${shareCard.rank}\nmonkeymind.lovable.app`;
+                        navigator.clipboard.writeText(text).then(()=>setXpPopup({xp:0,label:"Zkopírováno! 📋"}));
+                      }} className="reason-card" style={{padding:"12px 20px",background:T.card,border:`1px solid ${T.border}`,borderRadius:99,color:T.t2,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+                        📋 Kopírovat
+                      </button>
+                    </div>
                   </div>
                 )}
 
