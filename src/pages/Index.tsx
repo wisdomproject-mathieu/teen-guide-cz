@@ -1285,7 +1285,7 @@ export default function Index() {
                           </div>
                         </div>
                         <div style={{color:T.t2,fontSize:13,marginBottom:10,lineHeight:1.5}}>{s.text.substring(0,140)}...</div>
-                        <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo}/>
+                        <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo} onComplete={()=>completeQuest("speech")}/>
                       </div>
                     ))}
                   </div>
@@ -1298,7 +1298,7 @@ export default function Index() {
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Zklidni opici — dýchej</span>
                   </div>
                   <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16}}>
-                    <BreathingExercise type={recs.breathType}/>
+                    <BreathingExercise type={recs.breathType} onComplete={()=>completeQuest("breathe")}/>
                   </div>
                 </div>
 
