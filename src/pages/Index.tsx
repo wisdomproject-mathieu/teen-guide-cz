@@ -1327,7 +1327,7 @@ export default function Index() {
                       {[{n:5,q:"Co vidíš?"},{n:4,q:"Co cítíš dotykem?"},{n:3,q:"Co slyšíš?"},{n:2,q:"Co cítíš vůní?"},{n:1,q:"Jaká chuť?"}].map(s=>
                         <div key={s.n} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                           <span style={{color:T.accent,fontSize:20,fontWeight:900}}>{s.n}</span>
-                          <input placeholder={s.q} style={{flex:1,padding:8,background:"transparent",border:`1px solid ${T.border}`,borderRadius:8,color:T.t1,fontSize:13,fontFamily:"inherit"}}/>
+                          <input placeholder={s.q} onChange={(e)=>{if(e.target.value.trim()&&s.n===1)completeQuest("grounding")}} style={{flex:1,padding:8,background:"transparent",border:`1px solid ${T.border}`,borderRadius:8,color:T.t1,fontSize:13,fontFamily:"inherit"}}/>
                         </div>
                       )}
                     </div>
