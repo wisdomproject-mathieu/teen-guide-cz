@@ -262,7 +262,9 @@ function UpgradeScreen({ onCopyAsk }: { onCopyAsk: () => void }) {
 
 function toEmbedUrl(url: string) {
   const match = url.match(/(?:v=|youtu\.be\/)([^?&]+)/);
-  return match ? `https://www.youtube.com/embed/${match[1]}` : url;
+  return match
+    ? `https://www.youtube.com/embed/${match[1]}?rel=0&modestbranding=1&playsinline=1&cc_load_policy=1&cc_lang_pref=cs`
+    : url;
 }
 
 function formatContentMeta(item: ContentItem) {
@@ -282,6 +284,7 @@ function getShortVisual(item: ContentItem) {
       image: monkeyAngry,
       glow: T.red,
       gradient: `linear-gradient(180deg, rgba(255,59,92,0.24), rgba(10,12,19,0.92))`,
+      motionClass: "anim-shortRage",
     };
   }
   if (item.mood.includes("anxiety") || item.mood.includes("sadness")) {
@@ -289,12 +292,14 @@ function getShortVisual(item: ContentItem) {
       image: monkeyAnxious,
       glow: T.blue,
       gradient: `linear-gradient(180deg, rgba(74,143,255,0.22), rgba(10,12,19,0.92))`,
+      motionClass: "anim-shortResolve",
     };
   }
   return {
     image: monkeyHero,
     glow: T.accent,
     gradient: `linear-gradient(180deg, rgba(255,122,47,0.22), rgba(10,12,19,0.92))`,
+    motionClass: "anim-shortResolve",
   };
 }
 
@@ -351,7 +356,10 @@ function MonkeyShortPlayer({
             ))}
           </div>
 
-          <img src={shortVisual.image} alt="" className="anim-monkeyBob" style={{width:160,height:160,objectFit:"contain",filter:`drop-shadow(0 0 28px ${shortVisual.glow}70)`}} />
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+            <div style={{width:128,height:18,borderRadius:"50%",background:`radial-gradient(circle, ${shortVisual.glow}55 0%, rgba(255,255,255,0.08) 45%, transparent 72%)`,filter:"blur(4px)",opacity:0.85}} />
+            <img src={shortVisual.image} alt="" className={shortVisual.motionClass} style={{width:160,height:160,objectFit:"contain",filter:`drop-shadow(0 0 28px ${shortVisual.glow}70)`}} />
+          </div>
 
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,width:"100%"}}>
             <div style={{color:T.t3,fontSize:11,fontWeight:700,letterSpacing:0.35}}>SCÉNA {lineIndex + 1} / {lines.length}</div>
@@ -453,6 +461,14 @@ function LibraryCard({
           style={{padding:"11px 14px",background:T.tealDim,border:`1px solid ${T.teal}35`,borderRadius:12,color:T.teal,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
         >
           Otevřít v Opičákovi
+        </button>
+      )}
+      {!locked && item.embedUrl && item.chatPrompt && (
+        <button
+          onClick={() => onOpenChat(item.chatPrompt!)}
+          style={{padding:"11px 14px",background:T.tealDim,border:`1px solid ${T.teal}35`,borderRadius:12,color:T.teal,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+        >
+          Dokoukal/a jsem to, otevřít reflexi v Opičákovi
         </button>
       )}
       {!locked && item.format === "video_short" && (
@@ -1721,12 +1737,16 @@ export default function Index() {
         @keyframes particle2{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(-60px,80px) scale(0)}}
         @keyframes particle3{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(70px,90px) scale(0)}}
         @keyframes monkeyBob{0%,100%{transform:translateY(0) rotate(0deg)}25%{transform:translateY(-4px) rotate(-3deg)}75%{transform:translateY(-2px) rotate(3deg)}}
+        @keyframes shortRage{0%,100%{transform:translateY(0) rotate(0deg) scale(1)}20%{transform:translateY(-1px) rotate(-2deg) scale(1.02)}40%{transform:translateY(0) rotate(2deg) scale(1.03)}60%{transform:translateY(-2px) rotate(-1deg) scale(1.01)}80%{transform:translateY(0) rotate(1deg) scale(1.02)}}
+        @keyframes shortResolve{0%,100%{transform:translateY(0) rotate(0deg) scale(1)}25%{transform:translateY(-2px) rotate(-1deg) scale(1.01)}50%{transform:translateY(0) rotate(1deg) scale(1.02)}75%{transform:translateY(-1px) rotate(0deg) scale(1.01)}}
         .anim-fadeUp{animation:fadeUp .4s ease-out both}
         .anim-fadeIn{animation:fadeIn .3s ease-out both}
         .anim-slideIn{animation:slideInRight .4s ease-out both}
         .anim-bounce{animation:bounceIn .5s cubic-bezier(.36,1.1,.3,1) both}
         .anim-float{animation:float 3s ease-in-out infinite}
         .anim-monkeyBob{animation:monkeyBob 2s ease-in-out infinite}
+        .anim-shortRage{animation:shortRage 1.05s ease-in-out infinite}
+        .anim-shortResolve{animation:shortResolve 1.45s ease-in-out infinite}
         .anim-d1{animation-delay:.05s}.anim-d2{animation-delay:.1s}.anim-d3{animation-delay:.15s}.anim-d4{animation-delay:.2s}.anim-d5{animation-delay:.25s}.anim-d6{animation-delay:.3s}.anim-d7{animation-delay:.35s}
         .mood-btn{transition:all .25s ease;position:relative;overflow:hidden}
         .mood-btn:hover{transform:scale(1.02);filter:brightness(1.15);box-shadow:0 0 18px rgba(255,122,47,0.25)}
