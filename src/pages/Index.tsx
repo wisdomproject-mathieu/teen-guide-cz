@@ -5,6 +5,7 @@ import Onboarding from "@/components/Onboarding";
 import InAppNotifications from "@/components/InAppNotifications";
 import { useAuth } from "@/hooks/useAuth";
 import { getRecommendations } from "@/data/speeches";
+import type { Speech } from "@/data/speeches";
 import monkeyHero from "@/assets/monkey-hero.png";
 import monkeySad from "@/assets/monkey-sad.png";
 import monkeyAngry from "@/assets/monkey-angry.png";
@@ -84,6 +85,21 @@ const REASONS=[
 
 const audioCache = new Map<string, string>();
 
+type MoodOption = typeof MOODS[number];
+type ReasonOption = typeof REASONS[number];
+type RecommendationBundle = ReturnType<typeof getRecommendations>;
+type MoodLogEntry = {
+  mood: { id: string };
+  reason: { id: string } | null;
+  ts: string;
+  id: string;
+};
+type BreathingPhase = { label: string; dur: number; color: string };
+type BreathingPattern = { name: string; phases: BreathingPhase[] };
+type CalendarDay = MoodLogEntry | null;
+type AudioNodeWithStop = AudioNode & { stop?: () => void };
+type WebkitAudioWindow = Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext };
+
 // ── SPEECH PLAYER ──
 function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: string; speechId: string; emotion: string}) {
   const [playing, setPlaying] = useState(false);
@@ -130,9 +146,9 @@ function BreathingExercise({type="box"}: {type?: string}) {
   const [active, setActive] = useState(false);
   const [phase, setPhase] = useState("ready");
   const [count, setCount] = useState(0);
-  const timerRef = useRef<any>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseRef = useRef(0);
-  const patterns: Record<string, any> = {
+  const patterns: Record<string, BreathingPattern> = {
     box:{name:"Box",phases:[{label:"Nádech",dur:4,color:T.teal},{label:"Drž",dur:4,color:T.blue},{label:"Výdech",dur:4,color:T.accent},{label:"Drž",dur:4,color:T.purple}]},
     sleep:{name:"4-7-8",phases:[{label:"Nádech",dur:4,color:T.teal},{label:"Drž",dur:7,color:T.blue},{label:"Výdech",dur:8,color:T.accent}]},
   };
@@ -423,7 +439,7 @@ function MonkeyChat() {
 }
 
 // ── MOOD INSIGHTS CHARTS (recharts) ──
-function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
+function MoodInsightsCharts({ moodLog }: { moodLog: MoodLogEntry[] }) {
   const [range, setRange] = useState<"week" | "month">("week");
   const moodScore: Record<string, number> = { great: 5, pumped: 4, meh: 3, angry: 2, sad: 2, anxious: 1, awful: 0 };
   const moodColors: Record<string, string> = { great: T.teal, pumped: T.blue, meh: T.accent, angry: T.red, sad: T.purple, anxious: "#FF7A2F", awful: T.red };
@@ -435,9 +451,9 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
     const date = new Date();
     date.setDate(date.getDate() - d);
     const ds = date.toLocaleDateString("cs-CZ");
-    const dayLogs = moodLog.filter((l: any) => l.ts.startsWith(ds));
+    const dayLogs = moodLog.filter((l) => l.ts.startsWith(ds));
     const avg = dayLogs.length > 0
-      ? dayLogs.reduce((s: number, l: any) => s + (moodScore[l.mood.id] ?? 3), 0) / dayLogs.length
+      ? dayLogs.reduce((s: number, l) => s + (moodScore[l.mood.id] ?? 3), 0) / dayLogs.length
       : null;
     const label = range === "week"
       ? ["Ne","Po","Út","St","Čt","Pá","So"][date.getDay()]
@@ -450,7 +466,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
   const filteredLogs = range === "week"
     ? moodLog.filter(l => { const d = new Date(); d.setDate(d.getDate() - 7); return new Date(l.ts.replace(/(\d+)\.\s*(\d+)\.\s*(\d+)/, '$3-$2-$1')) >= d || true; })
     : moodLog;
-  filteredLogs.forEach((l: any) => { counts[l.mood.id] = (counts[l.mood.id] || 0) + 1; });
+  filteredLogs.forEach((l) => { counts[l.mood.id] = (counts[l.mood.id] || 0) + 1; });
   const pieData = Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
     .map(([id, value]) => ({
@@ -461,7 +477,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
 
   // Top reasons
   const reasonCounts: Record<string, number> = {};
-  filteredLogs.forEach((l: any) => { if (l.reason) reasonCounts[l.reason.id] = (reasonCounts[l.reason.id] || 0) + 1; });
+  filteredLogs.forEach((l) => { if (l.reason) reasonCounts[l.reason.id] = (reasonCounts[l.reason.id] || 0) + 1; });
   const topReasons = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
     .map(([id, value]) => ({ name: REASONS.find(r => r.id === id)?.label || id, value, fill: T.accent }));
 
@@ -499,7 +515,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
               tickFormatter={(v: number) => ["💀","😰","😢","😐","💪","🔥"][v] || ""} />
             <Tooltip
               contentStyle={{background:"#1a1d2e",border:`1px solid ${T.border}`,borderRadius:12,fontSize:12,color:T.t1}}
-              formatter={(v: any) => [v !== null ? `${Number(v).toFixed(1)} / 5` : "—", "Skóre"]}
+              formatter={(v: number | null) => [v !== null ? `${Number(v).toFixed(1)} / 5` : "—", "Skóre"]}
               labelStyle={{color:T.t2}}
             />
             <Area type="monotone" dataKey="score" stroke={T.accent} strokeWidth={2.5} fill="url(#moodGrad)" dot={{r:3,fill:T.accent,stroke:"none"}} connectNulls={false} />
@@ -516,7 +532,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
             <YAxis dataKey="name" type="category" tick={{fill:T.t2,fontSize:12,fontWeight:600}} axisLine={false} tickLine={false} width={75} />
             <Tooltip
               contentStyle={{background:"#1a1d2e",border:`1px solid ${T.border}`,borderRadius:12,fontSize:12,color:T.t1}}
-              formatter={(v: any) => [`${v}×`, "Check-iny"]}
+              formatter={(v: number) => [`${v}×`, "Check-iny"]}
               labelStyle={{color:T.t2}}
             />
             <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={20}>
@@ -538,7 +554,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
               <YAxis dataKey="name" type="category" tick={{fill:T.t2,fontSize:12,fontWeight:600}} axisLine={false} tickLine={false} width={80} />
               <Tooltip
                 contentStyle={{background:"#1a1d2e",border:`1px solid ${T.border}`,borderRadius:12,fontSize:12,color:T.t1}}
-                formatter={(v: any) => [`${v}×`, "Zmíněno"]}
+                formatter={(v: number) => [`${v}×`, "Zmíněno"]}
                 labelStyle={{color:T.t2}}
               />
               <Bar dataKey="value" radius={[0, 8, 8, 0]} fill={T.teal} fillOpacity={0.8} barSize={20} />
@@ -564,14 +580,14 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
 }
 
 // ── PROFILE TAB (with Mood Insights) ──
-function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void}) {
+function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut}: {moodLog:MoodLogEntry[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void}) {
   const [activeSection, setActiveSection] = useState("overview");
   const [contacts, setContacts] = useState([{name:"",phone:""}]);
   const [diary, setDiary] = useState("");
   const days = ["Po","Út","St","Čt","Pá","So","Ne"];
 
   // Build calendar based on actual dates, not mood log index
-  const calendarWeeks: any[] = [];
+  const calendarWeeks: CalendarDay[][] = [];
   const today = new Date();
   // Show 4 weeks ending today — find the Monday 3 weeks ago
   const startDate = new Date(today);
@@ -582,8 +598,8 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
   startDate.setDate(startDate.getDate() + mondayOffset);
 
   // Group mood logs by date string
-  const moodByDate: Record<string, any> = {};
-  moodLog.forEach((l: any) => {
+  const moodByDate: Record<string, MoodLogEntry | undefined> = {};
+  moodLog.forEach((l) => {
     // Parse the Czech date format "D. M. YYYY, HH:MM:SS"
     const parts = l.ts.match(/(\d+)\.\s*(\d+)\.\s*(\d+)/);
     if (parts) {
@@ -643,7 +659,7 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
             <div style={{marginBottom:20}}>
               <div style={{color:T.t1,fontSize:14,fontWeight:700,marginBottom:8}}>Poslední nálady</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                {moodLog.slice(0,12).map((l:any,i:number) => {
+                {moodLog.slice(0,12).map((l, i:number) => {
                   const m = MOODS.find(x=>x.id===l.mood.id);
                   return <div key={i} style={{padding:"4px 10px",background:T.card,border:`1px solid ${T.border}`,borderRadius:8,fontSize:12,color:T.t2}}>{m?.label} {l.ts.split(",")[1]?.trim()}</div>;
                 })}
@@ -706,9 +722,9 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
           <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:6}}>
             {days.map(d=><div key={d} style={{textAlign:"center",color:T.t3,fontSize:11,fontWeight:600,padding:4}}>{d}</div>)}
           </div>
-          {calendarWeeks.map((week:any[],wi:number)=>(
+          {calendarWeeks.map((week, wi:number)=>(
             <div key={wi} style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:4}}>
-              {week.map((day:any,di:number)=>{
+              {week.map((day, di:number)=>{
                 const m = day ? MOODS.find(x=>x.id===day.mood.id) : null;
                 return <div key={di} style={{aspectRatio:"1",borderRadius:8,background:m?`${m.color}20`:T.card,border:`1px solid ${m?`${m.color}30`:T.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
                   {m && <img src={MOOD_MONKEY[m.id]} alt="" style={{width:20,height:20,objectFit:"contain"}}/>}
@@ -800,10 +816,17 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
   };
 
   const webAudioCtxRef = useRef<AudioContext|null>(null);
-  const webAudioNodesRef = useRef<AudioNode[]>([]);
+  const webAudioNodesRef = useRef<AudioNodeWithStop[]>([]);
 
   const stopWebAudio = () => {
-    webAudioNodesRef.current.forEach(n => { try { (n as any).stop?.(); (n as any).disconnect?.(); } catch {} });
+    webAudioNodesRef.current.forEach((node) => {
+      try {
+        node.stop?.();
+        node.disconnect?.();
+      } catch (error) {
+        console.debug("Web audio node cleanup skipped", error);
+      }
+    });
     webAudioNodesRef.current = [];
     if (webAudioCtxRef.current) { webAudioCtxRef.current.close().catch(() => {}); webAudioCtxRef.current = null; }
   };
@@ -812,7 +835,7 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
     stopWebAudio();
     const ctx = new AudioContext();
     webAudioCtxRef.current = ctx;
-    const nodes: AudioNode[] = [];
+    const nodes: AudioNodeWithStop[] = [];
     const master = ctx.createGain();
     master.gain.value = 0.25;
     master.connect(ctx.destination);
@@ -822,7 +845,8 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
       calm:  { freqs: [220, 277, 330], type: "sine", lfoRate: 0.1, filterFreq: 800 },
       sad:   { freqs: [196, 233, 294], type: "triangle", lfoRate: 0.08, filterFreq: 600 },
       happy: { freqs: [262, 330, 392, 523], type: "sine", lfoRate: 0.2, filterFreq: 2000 },
-      metal: { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
+      lofi:  { freqs: [196, 247, 294], type: "triangle", lfoRate: 0.12, filterFreq: 950 },
+      rage:  { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
     };
     const cfg = configs[genre.id] || configs.calm;
 
@@ -885,14 +909,15 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
       audio.onerror = () => { setMusicPlaying(false); setMusicLoading(false); setMusicError("Přehrávání selhalo"); };
       await audio.play();
       setMusicPlaying(true);
-    } catch (e: any) {
+    } catch (error) {
       // Fallback: Web Audio API ambient tones
       console.log("API failed, using Web Audio fallback for genre:", genre.id);
       try {
         playWebAudioFallback(genre);
         setMusicPlaying(true);
         setMusicError(null);
-      } catch {
+      } catch (fallbackError) {
+        console.error("SOS music fallback failed", fallbackError, error);
         setMusicError("Generování selhalo. Zkus to znovu.");
       }
     }
@@ -1025,9 +1050,9 @@ export default function Index() {
   const [xpPopup, setXpPopup] = useState<{xp:number;label:string}|null>(null);
   const [levelUp, setLevelUp] = useState<{level:number;skin?:typeof MONKEY_SKINS[0]|null}|null>(null);
   const [step, setStep] = useState(1);
-  const [selectedMood, setSelectedMood] = useState<any>(null);
-  const [selectedReason, setSelectedReason] = useState<any>(null);
-  const [recs, setRecs] = useState<any>(null);
+  const [selectedMood, setSelectedMood] = useState<MoodOption | null>(null);
+  const [selectedReason, setSelectedReason] = useState<ReasonOption | null>(null);
+  const [recs, setRecs] = useState<RecommendationBundle | null>(null);
 
   // Show onboarding for new users (no name set yet)
   useEffect(() => {
@@ -1036,7 +1061,7 @@ export default function Index() {
 
   const handleOnboardingComplete = (newName: string, moodId: string) => {
     cloud.updateName(newName);
-    const mood = MOODS.find(m => m.id === moodId);
+    const mood = MOODS.find((m) => m.id === moodId);
     if (mood) {
       setSelectedMood(mood);
       setStep(2); // go to reason selection
@@ -1045,9 +1070,16 @@ export default function Index() {
   };
 
   const handleNameChange = (n: string) => { cloud.updateName(n); };
-  const handleAvatar = (e: any) => {
+  const handleAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) { const r = new FileReader(); r.onload = (ev: any) => { setAvatar(ev.target.result); }; r.readAsDataURL(f); }
+    if (f) {
+      const r = new FileReader();
+      r.onload = (ev: ProgressEvent<FileReader>) => {
+        const result = ev.target?.result;
+        if (typeof result === "string") setAvatar(result);
+      };
+      r.readAsDataURL(f);
+    }
   };
 
   const completeQuest = (questId: string) => {
@@ -1073,8 +1105,9 @@ export default function Index() {
   };
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
-  const selectMood = (m: any) => { setSelectedMood(m); setStep(2); };
-  const selectReason = (r: any) => {
+  const selectMood = (m: MoodOption) => { setSelectedMood(m); setStep(2); };
+  const selectReason = (r: ReasonOption) => {
+    if (!selectedMood) return;
     setSelectedReason(r);
     cloud.logMood(selectedMood.id, r.id);
     const today = new Date().toISOString().split("T")[0];
@@ -1255,7 +1288,7 @@ export default function Index() {
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Řeč pro tebe</span>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                    {recs.speeches.map((s: any) => (
+                    {recs.speeches.map((s: Speech) => (
                       <div key={s.id} className="speech-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                           <span style={{fontSize:22}}>{s.icon}</span>
@@ -1289,7 +1322,7 @@ export default function Index() {
                       <img src={monkeyMusic} alt="" style={{width:28,height:28,objectFit:"contain"}} loading="lazy"/>
                       <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Vypusť páru</span>
                     </div>
-                    <button onClick={()=>{try{const c=new (window.AudioContext||(window as any).webkitAudioContext)();const o=c.createOscillator();const g=c.createGain();o.type="sawtooth";o.frequency.value=82+Math.random()*40;g.gain.value=0.3;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+4);g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+4)}catch(e){}}} style={{width:"100%",padding:"16px",background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,color:T.red,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>
+                    <button onClick={()=>{try{const AudioContextCtor = window.AudioContext || (window as WebkitAudioWindow).webkitAudioContext; if (!AudioContextCtor) return; const c = new AudioContextCtor(); const o = c.createOscillator(); const g = c.createGain(); o.type="sawtooth"; o.frequency.value=82+Math.random()*40; g.gain.value=0.3; o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+4); g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+4);} catch (error) { console.error("Heavy metal fallback failed", error); }}} style={{width:"100%",padding:"16px",background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,color:T.red,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>
                       🤘 HEAVY METAL — BLAST 🔊
                     </button>
                   </div>
