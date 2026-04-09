@@ -53,6 +53,7 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
+      const t = await response.text();
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Opičák potřebuje pauzu, zkus to za chvíli 🐵" }), {
           status: 429,
@@ -65,9 +66,8 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const t = await response.text();
       console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error" }), {
+      return new Response(JSON.stringify({ error: "AI gateway error", details: t }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

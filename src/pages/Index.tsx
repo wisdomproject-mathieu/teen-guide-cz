@@ -1291,7 +1291,7 @@ export default function Index() {
                   </div>
 
                   <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
-                    {MOODS.map((m) => {
+                    {[...MOODS].reverse().map((m) => {
                       const active = m.id === selectedMood.id;
                       return (
                         <button
@@ -1299,7 +1299,7 @@ export default function Index() {
                           onClick={() => selectMood(m)}
                           style={{padding:"8px 0",background:active?`${m.color}18`:T.card,border:`1px solid ${active?m.color:T.border}`,borderRadius:12,color:active?m.color:T.t3,fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
                         >
-                          {m.label.split("/")[0]}
+                          {m.id === "awful" ? "Dno" : m.label.split("/")[0]}
                         </button>
                       );
                     })}
