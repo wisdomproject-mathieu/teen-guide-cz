@@ -1173,8 +1173,9 @@ export default function Index() {
   };
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
-  const selectTier = (tier: typeof MOOD_TIERS[0]) => { setSelectedTier(tier); setStep(2); };
+  const handleSliderChange = (idx: number) => { setSliderIndex(idx); setSelectedMood(MOODS[idx]); setIntensity(3); };
   const selectMood = (m: any) => { setSelectedMood(m); setIntensity(3); };
+  const confirmMood = () => { if (selectedMood) setStep(2); };
   const selectReason = (r: any) => {
     setSelectedReason(r);
     cloud.logMood(selectedMood.id, r.id);
@@ -1192,13 +1193,12 @@ export default function Index() {
     }
     cloud.updateProgress(xp, newStreak, completedQuests);
     setRecs(getRecommendations(selectedMood, r));
-    setStep(4);
+    setStep(3);
     completeQuest("checkin");
     if (newStreak >= 3) completeQuest("streak3");
     if (newStreak >= 7) completeQuest("streak7");
   };
-  const confirmSubMood = () => { setStep(3); };
-  const resetFlow = () => { setStep(1); setSelectedTier(null); setSelectedMood(null); setSelectedReason(null); setRecs(null); setIntensity(3); setShareCard(null); };
+  const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); setIntensity(3); setShareCard(null); setSliderIndex(3); };
 
   const handleSpeechComplete = (speech: any) => {
     completeQuest("speech");
