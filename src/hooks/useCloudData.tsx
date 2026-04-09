@@ -25,6 +25,7 @@ export function useCloudData() {
   const [streakCount, setStreakCount] = useState(0);
   const [completedQuests, setCompletedQuests] = useState<string[]>([]);
   const [equippedSkin, setEquippedSkin] = useState("default");
+  const [subscriptionTier, setSubscriptionTier] = useState<"free" | "premium">("free");
   const [userName, setUserName] = useState("");
   const [lastCheckinDate, setLastCheckinDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,6 +48,7 @@ export function useCloudData() {
         setProfile(profileRes.data);
         setUserName(profileRes.data.display_name || "");
         setEquippedSkin(profileRes.data.equipped_skin || "default");
+        setSubscriptionTier(profileRes.data.subscription_tier === "premium" ? "premium" : "free");
       }
 
       if (moodsRes.data) {
@@ -116,7 +118,7 @@ export function useCloudData() {
 
   return {
     loading, moodLog, xp, streakCount, completedQuests,
-    equippedSkin, userName, profile, lastCheckinDate,
+    equippedSkin, subscriptionTier, userName, profile, lastCheckinDate,
     updateName, updateSkin, logMood, updateProgress,
     setMoodLog, setXp, setStreakCount, setCompletedQuests,
   };
