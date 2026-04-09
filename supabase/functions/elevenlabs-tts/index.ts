@@ -7,13 +7,13 @@ const corsHeaders = {
 
 // Tone-aware voice settings per emotion
 const VOICE_SETTINGS: Record<string, { stability: number; style: number; speed: number }> = {
-  anger:   { stability: 0.3, style: 0.7, speed: 1.1 },
-  sadness: { stability: 0.6, style: 0.4, speed: 0.9 },
-  anxiety: { stability: 0.7, style: 0.3, speed: 0.85 },
-  fear:    { stability: 0.5, style: 0.5, speed: 0.95 },
-  lonely:  { stability: 0.6, style: 0.4, speed: 0.9 },
-  overwhelm: { stability: 0.6, style: 0.3, speed: 0.9 },
-  all:     { stability: 0.5, style: 0.5, speed: 1.0 },
+  anger:   { stability: 0.28, style: 0.82, speed: 1.14 },
+  sadness: { stability: 0.44, style: 0.62, speed: 1.0 },
+  anxiety: { stability: 0.48, style: 0.58, speed: 1.02 },
+  fear:    { stability: 0.4, style: 0.68, speed: 1.04 },
+  lonely:  { stability: 0.42, style: 0.64, speed: 1.0 },
+  overwhelm: { stability: 0.4, style: 0.66, speed: 1.03 },
+  all:     { stability: 0.36, style: 0.74, speed: 1.08 },
 };
 
 serve(async (req) => {
@@ -56,7 +56,7 @@ serve(async (req) => {
           model_id: "eleven_multilingual_v2",
           voice_settings: {
             stability: settings.stability,
-            similarity_boost: 0.75,
+            similarity_boost: 0.82,
             style: settings.style,
             use_speaker_boost: true,
             speed: settings.speed,

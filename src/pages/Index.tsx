@@ -947,10 +947,27 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
   };
 
   const stopMusic = () => {
-    if (musicAudioRef.current) { musicAudioRef.current.pause(); musicAudioRef.current = null; }
+    if (musicAudioRef.current) {
+      musicAudioRef.current.pause();
+      musicAudioRef.current.currentTime = 0;
+      musicAudioRef.current = null;
+    }
     stopWebAudio();
     setMusicPlaying(false);
+    setMusicLoading(false);
+    setMusicGenre(null);
   };
+
+  useEffect(() => {
+    return () => {
+      if (musicAudioRef.current) {
+        musicAudioRef.current.pause();
+        musicAudioRef.current.currentTime = 0;
+        musicAudioRef.current = null;
+      }
+      stopWebAudio();
+    };
+  }, []);
 
   const nextGenre = () => {
     if (!musicGenre) return;
