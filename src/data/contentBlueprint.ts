@@ -29,6 +29,7 @@ export interface ContentItem {
   emotion?: string;
   educationPoints?: string[];
   chatPrompt?: string;
+  shortLines?: string[];
   notes?: string;
 }
 
@@ -128,6 +129,15 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     tags: ["video", "shorts", "shareable"],
     hook: "Krátký video zásah, ne další podcast do pozadí.",
     sourceKind: "original",
+    emotion: "anger",
+    text: "Nepiš to hned. Neposílej to hned. Tenhle moment není na útok, ale na převzetí kontroly. Dýchej. Ustup o krok. To nejsilnější, co teď můžeš udělat, je nerozbít další věc jen proto, že to v tobě hoří.",
+    shortLines: [
+      "Nepiš to hned.",
+      "Neposílej to hned.",
+      "Tenhle moment není na útok.",
+      "Tenhle moment je na kontrolu.",
+      "Dýchej. Ustup. Ovládni to.",
+    ],
     notes: "Should use original script plus Monkey avatar motion.",
   },
   {
@@ -142,6 +152,15 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     tags: ["night", "video", "spiral"],
     hook: "Pro 10pm-midnight doomscroll momenty.",
     sourceKind: "original",
+    emotion: "anxiety",
+    text: "Zastav scrolling. Ten pocit, že musíš pokračovat, není pravda, je to smyčka. Polož telefon na chvíli vedle sebe. Podívej se kolem. Není tu žádná katastrofa, jen přetížená hlava. Vrať se do těla. Vrať se do pokoje. Vrať se k sobě.",
+    shortLines: [
+      "Zastav scrolling.",
+      "Tohle není pravda. To je smyčka.",
+      "Polož telefon vedle sebe.",
+      "Vrať se do pokoje.",
+      "Vrať se k sobě.",
+    ],
     notes: "Target Sunday dread and late-night scrolling windows.",
   },
   {

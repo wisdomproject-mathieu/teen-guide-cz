@@ -276,16 +276,121 @@ function formatContentMeta(item: ContentItem) {
   return `${formatMap[item.format]} · ${item.durationSeconds}s`;
 }
 
+function getShortVisual(item: ContentItem) {
+  if (item.mood.includes("anger")) {
+    return {
+      image: monkeyAngry,
+      glow: T.red,
+      gradient: `linear-gradient(180deg, rgba(255,59,92,0.24), rgba(10,12,19,0.92))`,
+    };
+  }
+  if (item.mood.includes("anxiety") || item.mood.includes("sadness")) {
+    return {
+      image: monkeyAnxious,
+      glow: T.blue,
+      gradient: `linear-gradient(180deg, rgba(74,143,255,0.22), rgba(10,12,19,0.92))`,
+    };
+  }
+  return {
+    image: monkeyHero,
+    glow: T.accent,
+    gradient: `linear-gradient(180deg, rgba(255,122,47,0.22), rgba(10,12,19,0.92))`,
+  };
+}
+
+function MonkeyShortPlayer({
+  item,
+  onClose,
+}: {
+  item: ContentItem;
+  onClose: () => void;
+}) {
+  const lines = item.shortLines && item.shortLines.length > 0 ? item.shortLines : [item.hook];
+  const [lineIndex, setLineIndex] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const shortVisual = getShortVisual(item);
+
+  useEffect(() => {
+    if (!playing || lines.length <= 1) return;
+    const stepMs = Math.max(1800, Math.round((item.durationSeconds * 1000) / lines.length));
+    const interval = setInterval(() => {
+      setLineIndex((prev) => {
+        if (prev >= lines.length - 1) {
+          clearInterval(interval);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, stepMs);
+    return () => clearInterval(interval);
+  }, [item.durationSeconds, lines.length, playing]);
+
+  const progress = ((lineIndex + 1) / lines.length) * 100;
+  const fullText = item.text || lines.join(" ");
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:10002,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{width:"100%",maxWidth:390,borderRadius:28,overflow:"hidden",background:shortVisual.gradient,border:`1px solid ${shortVisual.glow}55`,boxShadow:`0 20px 70px ${shortVisual.glow}35`,position:"relative"}}>
+        <div style={{padding:18,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+          <div>
+            <div style={{color:T.t3,fontSize:10,fontWeight:900,letterSpacing:0.5}}>MONKEY SHORT</div>
+            <div style={{color:T.t1,fontSize:15,fontWeight:800}}>{item.title}</div>
+          </div>
+          <button onClick={onClose} style={{width:36,height:36,borderRadius:"50%",border:`1px solid ${T.border}`,background:"rgba(255,255,255,0.04)",color:T.t1,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+        </div>
+
+        <div style={{padding:"0 18px 18px"}}>
+          <div style={{height:6,borderRadius:99,background:"rgba(255,255,255,0.08)",overflow:"hidden",marginBottom:16}}>
+            <div style={{height:"100%",width:`${progress}%`,background:`linear-gradient(90deg, ${shortVisual.glow}, ${T.accent})`,transition:"width .35s ease"}} />
+          </div>
+
+          <div style={{borderRadius:24,padding:"22px 18px 18px",background:"rgba(8,10,18,0.52)",border:`1px solid rgba(255,255,255,0.08)`,minHeight:440,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"space-between",position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 50% 18%, ${shortVisual.glow}22, transparent 40%)`,pointerEvents:"none"}} />
+            <div style={{display:"flex",gap:7,alignSelf:"center",marginBottom:6}}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} style={{width:6,height:28 + (i % 3) * 10,borderRadius:99,background:i <= lineIndex ? shortVisual.glow : "rgba(255,255,255,0.12)",opacity:i <= lineIndex ? 1 : 0.5,transform:playing ? `scaleY(${1 + ((i + lineIndex) % 3) * 0.18})` : "scaleY(1)",transition:"all .35s ease"}} />
+              ))}
+            </div>
+
+            <img src={shortVisual.image} alt="" className="anim-monkeyBob" style={{width:160,height:160,objectFit:"contain",filter:`drop-shadow(0 0 28px ${shortVisual.glow}70)`}} />
+
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,width:"100%"}}>
+              <div style={{color:T.t3,fontSize:11,fontWeight:700,letterSpacing:0.35}}>SCÉNA {lineIndex + 1} / {lines.length}</div>
+              <div style={{color:T.t1,fontSize:26,fontWeight:900,lineHeight:1.15,textAlign:"center",maxWidth:280,letterSpacing:-0.4}}>
+                {lines[lineIndex]}
+              </div>
+              <div style={{color:T.t2,fontSize:12,lineHeight:1.55,textAlign:"center",maxWidth:300}}>
+                {item.hook}
+              </div>
+            </div>
+
+            <div style={{display:"flex",gap:10,width:"100%",marginTop:10}}>
+              <button onClick={() => setPlaying((prev) => !prev)} style={{flex:1,padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+                {playing ? "⏸ Pauza" : "▶ Pokračovat"}
+              </button>
+              <div style={{flex:1}}>
+                <SpeechPlayer text={fullText} label="Přehrát hlas" speechId={`short-${item.id}`} emotion={item.emotion || "all"} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LibraryCard({
   item,
   locked,
   onUpgrade,
   onOpenChat,
+  onOpenShort,
 }: {
   item: ContentItem;
   locked: boolean;
   onUpgrade: () => void;
   onOpenChat: (prompt: string) => void;
+  onOpenShort: (item: ContentItem) => void;
 }) {
   return (
     <div style={{background:T.card,border:`1px solid ${locked ? `${T.accent}25` : T.border}`,borderRadius:18,padding:16,display:"flex",flexDirection:"column",gap:10}}>
@@ -350,6 +455,14 @@ function LibraryCard({
           Otevřít v Opičákovi
         </button>
       )}
+      {!locked && item.format === "video_short" && (
+        <button
+          onClick={() => onOpenShort(item)}
+          style={{padding:"11px 14px",background:`linear-gradient(135deg, ${T.purple}16, ${T.blue}12)`,border:`1px solid ${T.purple}35`,borderRadius:12,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+        >
+          Spustit Monkey short
+        </button>
+      )}
       {locked && (
         <button
           onClick={onUpgrade}
@@ -373,9 +486,11 @@ function ContentLibrary({
 }) {
   const freeItems = CONTENT_BLUEPRINT.filter((item) => FREE_TASTE_LAYER_IDS.includes(item.id as typeof FREE_TASTE_LAYER_IDS[number]));
   const premiumItems = CONTENT_BLUEPRINT.filter((item) => PREMIUM_HERO_IDS.includes(item.id as typeof PREMIUM_HERO_IDS[number]));
+  const [activeShort, setActiveShort] = useState<ContentItem | null>(null);
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
+      {activeShort && <MonkeyShortPlayer item={activeShort} onClose={() => setActiveShort(null)} />}
       <div>
         <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:6}}>Taste layer zdarma</div>
         <div style={{color:T.t2,fontSize:12,marginBottom:12,lineHeight:1.6}}>
@@ -383,7 +498,7 @@ function ContentLibrary({
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {freeItems.map((item) => (
-            <LibraryCard key={item.id} item={item} locked={false} onUpgrade={onUpgrade} onOpenChat={onOpenChat} />
+            <LibraryCard key={item.id} item={item} locked={false} onUpgrade={onUpgrade} onOpenChat={onOpenChat} onOpenShort={setActiveShort} />
           ))}
         </div>
       </div>
@@ -398,7 +513,7 @@ function ContentLibrary({
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {premiumItems.map((item) => (
-            <LibraryCard key={item.id} item={item} locked={!isPremium} onUpgrade={onUpgrade} onOpenChat={onOpenChat} />
+            <LibraryCard key={item.id} item={item} locked={!isPremium} onUpgrade={onUpgrade} onOpenChat={onOpenChat} onOpenShort={setActiveShort} />
           ))}
         </div>
       </div>
