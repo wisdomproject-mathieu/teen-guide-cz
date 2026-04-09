@@ -343,7 +343,8 @@ function MonkeyChat() {
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Něco se pokazilo" }));
-        setMessages(prev => [...prev, { role: "assistant", content: err.error || "Opičák teď nemůže, zkus to znovu 🐵" }]);
+        const detailText = typeof err.details === "string" && err.details.trim() ? `\n${err.details}` : "";
+        setMessages(prev => [...prev, { role: "assistant", content: `${err.error || "Opičák teď nemůže, zkus to znovu 🐵"}${detailText}` }]);
         setIsLoading(false);
         return;
       }

@@ -54,6 +54,14 @@ serve(async (req) => {
 
     if (!response.ok) {
       const t = await response.text();
+      let upstreamMessage = "";
+      try {
+        const parsed = JSON.parse(t);
+        upstreamMessage = parsed?.message || parsed?.error || "";
+      } catch {
+        upstreamMessage = "";
+      }
+
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Opičák potřebuje pauzu, zkus to za chvíli 🐵" }), {
           status: 429,
@@ -63,6 +71,15 @@ serve(async (req) => {
       if (response.status === 402) {
         return new Response(JSON.stringify({ error: "Opičák je unavený, zkus to později" }), {
           status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 401 || upstreamMessage.toLowerCase().includes("invalid api key")) {
+        return new Response(JSON.stringify({
+          error: "Neplatný LOVABLE_API_KEY",
+          details: upstreamMessage || t,
+        }), {
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

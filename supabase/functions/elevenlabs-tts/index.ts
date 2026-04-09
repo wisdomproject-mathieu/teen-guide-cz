@@ -67,8 +67,18 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errText = await response.text();
+      let upstreamMessage = "";
+      try {
+        const parsed = JSON.parse(errText);
+        upstreamMessage = parsed?.detail?.message || parsed?.message || "";
+      } catch {
+        upstreamMessage = "";
+      }
       console.error("ElevenLabs error:", response.status, errText);
-      return new Response(JSON.stringify({ error: "TTS generation failed", details: errText }), {
+      return new Response(JSON.stringify({
+        error: upstreamMessage.toLowerCase().includes("invalid api key") ? "Neplatný ELEVENLABS_API_KEY" : "TTS generation failed",
+        details: upstreamMessage || errText,
+      }), {
         status: response.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
