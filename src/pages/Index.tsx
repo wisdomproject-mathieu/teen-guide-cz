@@ -1415,8 +1415,8 @@ export default function Index() {
               </>
             )}
 
-            {/* STEP 4 — tailored results */}
-            {step === 4 && recs && (
+            {/* STEP 3 — tailored results */}
+            {step === 3 && recs && (
               <>
                 <button onClick={resetFlow} style={{background:"none",border:"none",color:T.accent,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12}}>← Nový check-in</button>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
