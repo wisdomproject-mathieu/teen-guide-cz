@@ -108,6 +108,7 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
 
@@ -128,40 +129,53 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
     let audioUrl = audioCache.get(speechId);
     if (!audioUrl) {
       setLoading(true);
+      setError(null);
       try {
         const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
           method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
           body: JSON.stringify({ text, emotion }),
         });
         if (!response.ok) throw new Error(`TTS failed`);
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("audio")) throw new Error(`Unexpected content type: ${contentType}`);
         const audioBlob = await response.blob();
+        if (audioBlob.size < 1000) throw new Error("Empty audio");
         audioUrl = URL.createObjectURL(audioBlob);
         audioCache.set(speechId, audioUrl);
         setUsingFallback(false);
-      } catch {
+      } catch (err) {
+        console.error("Speech playback failed", err);
         setLoading(false);
-        const u = new SpeechSynthesisUtterance(text); u.lang = "cs-CZ"; u.rate = 0.82;
-        synthRef.current = u;
         setUsingFallback(true);
-        u.onend = () => { synthRef.current = null; setPlaying(false); };
-        u.onerror = () => { synthRef.current = null; setPlaying(false); };
-        setPlaying(true); window.speechSynthesis.speak(u); return;
+        setError("Prémiový hlas se teď nenačetl. Zkus to prosím znovu.");
+        return;
       }
       setLoading(false);
     }
     const audio = new Audio(audioUrl); audioRef.current = audio;
-    audio.onended = () => setPlaying(false); audio.onerror = () => setPlaying(false);
+    audio.onended = () => setPlaying(false);
+    audio.onerror = () => {
+      setPlaying(false);
+      setError("Přehrání hlasu selhalo. Zkus to prosím znovu.");
+    };
     setUsingFallback(false);
+    setError(null);
     setPlaying(true);
-    audio.play().catch(() => setPlaying(false));
+    audio.play().catch(() => {
+      setPlaying(false);
+      setError("Přehrání hlasu selhalo. Zkus to prosím znovu.");
+    });
   };
   useEffect(() => { return () => { stopPlayback(); }; }, []);
   return (
-    <button onClick={play} disabled={loading} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:12,cursor:loading?"wait":"pointer",fontFamily:"inherit",width:"100%"}}>
-      <span style={{fontSize:18,color:T.accent}}>{loading?"⏳":playing?"■":"▶"}</span>
-      <span style={{color:T.t1,fontSize:13,fontWeight:600}}>{loading?"Generuji hlas...":usingFallback?"Nouzový hlas":label}</span>
-      {playing && <span style={{color:T.accent,fontSize:11,marginLeft:"auto"}}>{usingFallback?"🤖 Robot":"🔊 Hraje"}</span>}
-    </button>
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <button onClick={play} disabled={loading} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:12,cursor:loading?"wait":"pointer",fontFamily:"inherit",width:"100%"}}>
+        <span style={{fontSize:18,color:T.accent}}>{loading?"⏳":playing?"■":"▶"}</span>
+        <span style={{color:T.t1,fontSize:13,fontWeight:600}}>{loading?"Generuji hlas...":usingFallback?"Hlas potřebuje zkusit znovu":label}</span>
+        {playing && <span style={{color:T.accent,fontSize:11,marginLeft:"auto"}}>🔊 Hraje</span>}
+      </button>
+      {error && <div style={{color:T.red,fontSize:12,fontWeight:700}}>{error}</div>}
+    </div>
   );
 }
 
