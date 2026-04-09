@@ -315,7 +315,7 @@ function MonkeyShortPlayer({
     [item.hook, item.shortLines]
   );
   const [lineIndex, setLineIndex] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(false);
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [voicePlaying, setVoicePlaying] = useState(false);
@@ -346,7 +346,10 @@ function MonkeyShortPlayer({
     if (!playing || voicePlaying) return;
     const totalMs = item.durationSeconds * 1000;
     runCaptionSequence(totalMs);
-    const endTimer = window.setTimeout(() => setLineIndex(lines.length - 1), totalMs);
+    const endTimer = window.setTimeout(() => {
+      setLineIndex(lines.length - 1);
+      setPlaying(false);
+    }, totalMs);
     timersRef.current.push(endTimer);
     return () => clearCaptionTimers();
   }, [clearCaptionTimers, item.durationSeconds, lines.length, playing, runCaptionSequence, voicePlaying]);
@@ -374,35 +377,55 @@ function MonkeyShortPlayer({
       setVoiceLoading(false);
       clearCaptionTimers();
       setLineIndex(0);
+      setPlaying(false);
       return;
     }
 
     setVoiceError(null);
     setVoiceLoading(true);
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-        body: JSON.stringify({ text: fullText, emotion: item.emotion || "all" }),
-      });
-      if (!response.ok) throw new Error("TTS failed");
-      const audioBlob = await response.blob();
-      if (audioBlob.size < 1000) throw new Error("Empty audio");
-      const url = URL.createObjectURL(audioBlob);
-      const audio = new Audio(url);
+      let audioUrl = audioCache.get(`short-${item.id}`);
+      if (!audioUrl) {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          body: JSON.stringify({ text: fullText, emotion: item.emotion || "all" }),
+        });
+        if (!response.ok) throw new Error("TTS failed");
+        const audioBlob = await response.blob();
+        if (audioBlob.size < 1000) throw new Error("Empty audio");
+        audioUrl = URL.createObjectURL(audioBlob);
+        audioCache.set(`short-${item.id}`, audioUrl);
+      }
+      const audio = new Audio(audioUrl);
+      audio.preload = "auto";
       audioRef.current = audio;
       audio.onended = () => {
         setVoicePlaying(false);
         setVoiceLoading(false);
+        setPlaying(false);
       };
       audio.onerror = () => {
         setVoicePlaying(false);
         setVoiceLoading(false);
+        setPlaying(false);
         setVoiceError("Prémiový hlas teď není dostupný.");
       };
-      await new Promise<void>((resolve) => {
-        audio.onloadedmetadata = () => resolve();
+      await new Promise<void>((resolve, reject) => {
+        const timeout = window.setTimeout(() => reject(new Error("Audio load timeout")), 8000);
+        const finish = () => {
+          window.clearTimeout(timeout);
+          resolve();
+        };
+        audio.onloadedmetadata = finish;
+        audio.oncanplaythrough = finish;
+        audio.onerror = () => {
+          window.clearTimeout(timeout);
+          reject(new Error("Audio load failed"));
+        };
       });
+      setLineIndex(0);
+      setPlaying(true);
       runCaptionSequence((audio.duration || item.durationSeconds) * 1000);
       await audio.play();
       setVoicePlaying(true);
@@ -470,7 +493,7 @@ function MonkeyShortPlayer({
 
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,width:"100%",marginTop:10}}>
             <button onClick={() => setPlaying((prev) => !prev)} style={{flex:1,padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-              {playing ? "⏸ Pauza" : "▶ Pokračovat"}
+              {playing ? "⏸ Pauza textu" : lineIndex > 0 ? "▶ Pokračovat v textu" : "▶ Spustit text"}
             </button>
             <button onClick={playVoice} style={{flex:1,padding:"11px 14px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
               {voiceLoading ? "⏳ Načítám hlas" : voicePlaying ? "■ Zastavit hlas" : "🔊 Přehrát prémiový hlas"}
@@ -479,6 +502,11 @@ function MonkeyShortPlayer({
               📤 Sdílet / zkopírovat short quote
             </button>
           </div>
+          {!voicePlaying && !playing && (
+            <div style={{marginTop:10,color:T.t3,fontSize:12,textAlign:"center"}}>
+              Short čeká na tebe. Nejdřív si můžeš pustit text, nebo rovnou prémiový hlas.
+            </div>
+          )}
           {voiceError && <div style={{marginTop:10,color:T.red,fontSize:12,fontWeight:700,textAlign:"center"}}>{voiceError}</div>}
         </div>
       </div>
@@ -533,9 +561,9 @@ function LibraryCard({
       ) : (
         <div style={{padding:12,background:locked ? `${T.accent}08` : "rgba(255,255,255,0.03)",border:`1px solid ${locked ? `${T.accent}20` : T.border}`,borderRadius:14}}>
           <div style={{color:T.t1,fontSize:13,fontWeight:700,marginBottom:4}}>
-            {locked ? "Odemkne se v Premium" : "Monkey Mind originál"}
+            {locked ? "Odemkne se v Premium" : "Monkey Mind obsah"}
           </div>
-          <div style={{color:T.t2,fontSize:12,lineHeight:1.5}}>{item.notes || "Obsah je připravený pro další build pass."}</div>
+          <div style={{color:T.t2,fontSize:12,lineHeight:1.5}}>{item.notes || "Obsah připravený pro rychlou podporu, když to potřebuješ."}</div>
         </div>
       )}
       {!locked && item.format === "speech" && item.text && (
@@ -614,9 +642,9 @@ function ContentLibrary({
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
       <div>
-        <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:6}}>Taste layer zdarma</div>
+        <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:6}}>Zdarma právě teď</div>
         <div style={{color:T.t2,fontSize:12,marginBottom:12,lineHeight:1.6}}>
-          To nejlepší z free vrstvy: rychlé zásahy, bezpečí a jeden oficiální YouTube embed bez copyright risku.
+          Rychlé zásahy, bezpečí a jeden silný motivační video pick, který si můžeš pustit hned.
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {freeItems.map((item) => (
@@ -628,10 +656,10 @@ function ContentLibrary({
       <div>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
           <span style={{color:T.accent,fontSize:16,fontWeight:900}}>Monkey Premium</span>
-          <span style={{color:T.t3,fontSize:11}}>80% obsahu podle strategie</span>
+          <span style={{color:T.t3,fontSize:11}}>Více obsahu, větší zásah</span>
         </div>
         <div style={{color:T.t2,fontSize:12,marginBottom:12,lineHeight:1.6}}>
-          Tady je směr, který bude appku odlišovat: originální rage packy, Monkey shorts, vzdělávací moduly a chat startéry.
+          Tady najdeš delší video výběr, Monkey shorts, silnější speech packy a rychlé vstupy do Opičáka.
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {premiumItems.map((item) => (
@@ -1294,7 +1322,7 @@ function ProfileTab({
         <div>
           <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:6}}>Monkey knihovna</div>
           <div style={{color:T.t2,fontSize:12,marginBottom:14,lineHeight:1.6}}>
-            Free obsah jako taste layer, premium obsah jako skutečný důvod zůstat. YouTube jen jako oficiální embed, Monkey obsah jako originál.
+            Vyber si rychlý speech, silný short nebo motivační video. Nejlepší kousky jsou připravené zdarma, hlubší obsah odemyká Premium.
           </div>
           <ContentLibrary isPremium={isPremium} onUpgrade={onUpgrade} onOpenChat={onOpenChat} />
         </div>
@@ -2068,7 +2096,7 @@ export default function Index() {
                   <img src={monkeyWarrior} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
                   <div>
                     <div style={{color:T.t1,fontSize:15,fontWeight:800}}>🎬 Otevři Monkey knihovnu</div>
-                    <div style={{color:T.t2,fontSize:12}}>Free taste layer + premium shorts, packy a YouTube embedy</div>
+                    <div style={{color:T.t2,fontSize:12}}>Speech, Monkey shorts a vybraná motivační videa na jednom místě</div>
                   </div>
                 </button>
 

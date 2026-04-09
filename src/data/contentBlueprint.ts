@@ -52,7 +52,7 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     sourceKind: "original",
     emotion: "anger",
     text: "Zastav. Neodpovídej hned. Ten tlak v tobě je energie, ne rozkaz. Tři nádechy. Tři výdechy. To, co uděláš za dalších deset sekund, rozhodne, jestli tenhle moment ovládneš, nebo on ovládne tebe. Ty nejsi výbuch. Ty jsi ten, kdo ho drží v ruce.",
-    notes: "One of the top 3 free speeches. Must hit hard immediately.",
+    notes: "Rychlý zásah pro chvíle, kdy cítíš, že to každou sekundu bouchne.",
   },
   {
     id: "free-sunday-dread-60",
@@ -68,7 +68,7 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     sourceKind: "original",
     emotion: "anxiety",
     text: "Nedělní večer ti lže. Zítra není soudný den. Je to jen pondělí. Nemusíš zvládnout celý týden najednou. Jen ráno vstát. Jen dát první hodinu. Jen projít první blok. Zmenši horizont. Přežij první krok. Pak druhý. Takhle se poráží dread.",
-    notes: "High-value free sample tied to a known trigger moment.",
+    notes: "Krátká pomoc přesně pro neděli večer, pondělní tlak a noční stres.",
   },
   {
     id: "free-lonely-proof-45",
@@ -84,7 +84,7 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     sourceKind: "original",
     emotion: "lonely",
     text: "To, že se teď cítíš sám, neznamená, že jsi sám. Znamená to jen, že jsi v momentu, kdy tvůj mozek nevidí celý obraz. Tvůj kmen může být ještě před tebou. Tvoje budoucí lidi existují. Dýchej. Vydrž dnešek. To někdy stačí jako největší vítězství.",
-    notes: "Third free speech from the taste layer.",
+    notes: "Když máš pocit, že na všechno zůstáváš sám, začni právě tady.",
   },
   {
     id: "free-youtube-hero",
@@ -100,7 +100,7 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     sourceKind: "curated_embed",
     embedUrl: "https://www.youtube.com/watch?v=tbnzAVRZ9Xc",
     chatPrompt: "Dokoukal jsem Denzel video o tom, že máme padat dopředu, a chci ten pocit převést do konkrétního dalšího kroku v mém životě.",
-    notes: "Official embed only. Prefer Czech captions when YouTube provides them.",
+    notes: "Pusť si to celé a pak si ten pocit převeď do vlastního dalšího kroku.",
   },
   {
     id: "premium-youtube-rise-pack",
@@ -116,7 +116,7 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     sourceKind: "curated_embed",
     embedUrl: "https://www.youtube.com/watch?v=UB7nGT3egak",
     chatPrompt: "Dokoukal jsem to premium video a chci ten pocit udržet. Pomoz mi přetavit ho do jedné konkrétní akce ještě dnes.",
-    notes: "Official embed only. Prefer Czech captions when YouTube provides them.",
+    notes: "Delší video pro momenty, kdy potřebuješ tvrdší message a víc energie.",
   },
   {
     id: "premium-youtube-belief-pack",
@@ -132,7 +132,7 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     sourceKind: "curated_embed",
     embedUrl: "https://www.youtube.com/watch?v=I_mPoUWBMf4",
     chatPrompt: "To video mi něco připomnělo a nechci ten pocit zase ztratit. Pomoz mi to přeložit do reality v mém životě.",
-    notes: "Official embed only. Prefer Czech captions when YouTube provides them.",
+    notes: "Video pro chvíle, kdy potřebuješ znovu uvěřit sobě a nezabalit to.",
   },
   {
     id: "premium-rage-pack-01",
@@ -148,7 +148,7 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     sourceKind: "original",
     emotion: "anger",
     text: "Jestli to v tobě vaří, použij to chytře. Nízký tlak? Ochlaď hlavu a mluv čistě. Střední tlak? Jdi ven, rozhýbej tělo, nenech to shnít. Maximální tlak? Žádné zprávy, žádné rozhodnutí, nejdřív reset nervového systému. Vztek není plán. Vztek je palivo.",
-    notes: "Premium because it includes intensity variants and a full pack.",
+    notes: "Silnější speech pack podle toho, jak moc to v tobě právě vaří.",
   },
   {
     id: "premium-monkey-short-rage",
@@ -171,7 +171,7 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
       "Tenhle moment je na kontrolu.",
       "Dýchej. Ustup. Ovládni to.",
     ],
-    notes: "Should use original script plus Monkey avatar motion.",
+    notes: "Krátký zásah do momentu, kdy máš chuť vrátit úder a všechno zhoršit.",
   },
   {
     id: "premium-night-spiral-short",
@@ -194,7 +194,7 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
       "Vrať se do pokoje.",
       "Vrať se k sobě.",
     ],
-    notes: "Target Sunday dread and late-night scrolling windows.",
+    notes: "Krátký stop moment pro noční scroll, tlak v hlavě a přetížený večer.",
   },
   {
     id: "premium-pochopto-social",
@@ -206,14 +206,14 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     intensity: [1, 2],
     durationSeconds: 150,
     tags: ["education", "social", "curriculum"],
-    hook: "Teens want to understand why they feel wrecked after scrolling.",
+    hook: "Pochop, proč se po scrollu cítíš rozbitě, i když jsi jen ležel v posteli.",
     sourceKind: "original",
     educationPoints: [
       "Algoritmus neodměňuje klid. Odměňuje reakci, srovnávání a návrat do appky.",
       "Po scrollu často necítíš únavu jen psychicky. Je to i dopaminový crash a přetížená pozornost.",
       "Nejsilnější obrana není disciplína navždy. Je to menší friction: vypnuté notifikace, limity, záchytný rituál po scrollu.",
     ],
-    notes: "Keep one education module free, gate the full curriculum.",
+    notes: "Pomůže pochopit, co s tebou dělají sítě, a jak z toho ven bez hero výkonu.",
   },
   {
     id: "premium-chat-school-fail",
@@ -228,7 +228,7 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     hook: "Pomůže AI chatu začít konkrétně a bez trapného prázdna.",
     sourceKind: "original",
     chatPrompt: "Propadl jsem nebo jsem pokazil něco ve škole a mám pocit, že jsem úplně k ničemu. Potřebuju se z toho vyhrabat a slyšet jeden konkrétní další krok.",
-    notes: "Use as paid chat quick-starter prompts.",
+    notes: "Otevře Opičáka rovnou s konkrétním tématem, bez prázdné obrazovky.",
   },
   {
     id: "licensed-creator-pack-001",
@@ -240,9 +240,9 @@ export const CONTENT_BLUEPRINT: ContentItem[] = [
     intensity: [2, 3],
     durationSeconds: 75,
     tags: ["licensed", "creator", "premium"],
-    hook: "Future lane for a real Czech creator voice with explicit permission.",
+    hook: "Budoucí premium série s reálným českým hlasem a jasně vyřešenou licencí.",
     sourceKind: "licensed_creator",
-    notes: "Only populate after written permission and usage rights are secured.",
+    notes: "Tahle část se zapne až ve chvíli, kdy budou hotová všechna práva a souhlasy.",
   },
 ];
 
