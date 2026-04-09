@@ -1135,12 +1135,11 @@ export default function Index() {
     if (uid) {
       await supabase.from("profiles").update({ onboarded: true } as any).eq("id", uid);
     }
-    const mood = MOODS.find(m => m.id === moodId);
-    if (mood) {
-      const tier = MOOD_TIERS.find(t => t.id === (mood as any).tier);
-      if (tier) setSelectedTier(tier);
-      setSelectedMood(mood);
-      setStep(2);
+    const moodIdx = MOODS.findIndex(m => m.id === moodId);
+    if (moodIdx >= 0) {
+      setSliderIndex(moodIdx);
+      setSelectedMood(MOODS[moodIdx]);
+      setStep(1); // show slider screen with pre-selected mood
     }
     setShowOnboarding(false);
   };
