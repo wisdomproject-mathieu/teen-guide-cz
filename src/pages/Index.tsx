@@ -1308,115 +1308,88 @@ export default function Index() {
             {step === 1 && (
               <>
                 <InAppNotifications lastCheckinDate={lastCheckinDate} streakCount={streakCount} userName={userName} onNavigate={(t) => { setTab(t); resetFlow(); }} />
-                <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:14,marginBottom:24,padding:20,background:`linear-gradient(135deg, ${T.accent}15, transparent)`,borderRadius:24,border:`1px solid ${T.accent}20`}}>
-                  <img src={monkeyHero} alt="" className="tab-monkey" style={{width:72,height:72,objectFit:"contain"}} />
+                
+                {/* Single-screen: Emotion Slider + Intensity */}
+                <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:14,marginBottom:20,padding:20,background:`linear-gradient(135deg, ${T.accent}15, transparent)`,borderRadius:24,border:`1px solid ${T.accent}20`}}>
+                  <img src={MOOD_MONKEY[MOODS[sliderIndex]?.id] || monkeyHero} alt="" className="tab-monkey" style={{width:72,height:72,objectFit:"contain",transition:"all .3s"}} />
                   <div>
-                    <div style={{color:T.t1,fontSize:26,fontWeight:900,letterSpacing:-0.5}}>Jak se cítíš?</div>
-                    <div style={{color:T.t2,fontSize:14,marginTop:4}}>Stačí jedno kliknutí 👇</div>
+                    <div style={{color:MOODS[sliderIndex]?.color||T.t1,fontSize:26,fontWeight:900,letterSpacing:-0.5,transition:"color .3s"}}>{MOODS[sliderIndex]?.label}</div>
+                    <div style={{color:T.t2,fontSize:13,marginTop:2}}>{MOODS[sliderIndex]?.sub}</div>
                   </div>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                  {MOOD_TIERS.map((tier, i) => (
-                    <button key={tier.id} onClick={()=>selectTier(tier)} className={`reason-card anim-fadeUp anim-d${i+1}`} style={{
-                      display:"flex",alignItems:"center",gap:16,padding:"20px 24px",
-                      background:tier.gradient,border:`1px solid ${tier.color}25`,borderRadius:20,
-                      cursor:"pointer",fontFamily:"inherit",textAlign:"left",
-                    }}>
-                      <span style={{fontSize:44,lineHeight:1}}>{tier.emoji}</span>
-                      <div style={{flex:1}}>
-                        <div style={{color:T.t1,fontSize:20,fontWeight:900}}>{tier.label}</div>
-                        <div style={{color:T.t2,fontSize:13,marginTop:2}}>{tier.sub}</div>
-                      </div>
-                      <span style={{color:tier.color,fontSize:20,opacity:0.6}}>→</span>
-                    </button>
+
+                {/* Emoji row */}
+                <div style={{display:"flex",justifyContent:"space-between",padding:"0 4px",marginBottom:4}}>
+                  {MOODS.map((m,i)=>(
+                    <button key={m.id} onClick={()=>handleSliderChange(i)} style={{
+                      fontSize: sliderIndex===i ? 32 : 20, transition:"all .2s",
+                      background:"none",border:"none",cursor:"pointer",padding:2,
+                      opacity: sliderIndex===i ? 1 : 0.5,
+                      transform: sliderIndex===i ? "scale(1.2)" : "scale(1)",
+                    }}>{m.emoji}</button>
                   ))}
                 </div>
-              </>
-            )}
 
-            {/* STEP 2 — Sub-emotions + Intensity */}
-            {step === 2 && selectedTier && (
-              <>
-                <button onClick={()=>{setStep(1);setSelectedTier(null);setSelectedMood(null)}} style={{background:"none",border:"none",color:T.t2,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12,display:"flex",alignItems:"center",gap:4}}>← Zpět</button>
-                <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:12,marginBottom:20,padding:16,background:selectedTier.gradient,borderRadius:20,border:`1px solid ${selectedTier.color}25`}}>
-                  <span style={{fontSize:40}}>{selectedTier.emoji}</span>
-                  <div>
-                    <div style={{color:T.t1,fontSize:20,fontWeight:900}}>{selectedTier.label}</div>
-                    <div style={{color:T.t2,fontSize:13}}>Co přesně cítíš?</div>
-                  </div>
+                {/* Slider track */}
+                <div style={{position:"relative",padding:"0 8px",marginBottom:24}}>
+                  <input type="range" min={0} max={MOODS.length-1} value={sliderIndex}
+                    onChange={e=>handleSliderChange(Number(e.target.value))}
+                    style={{
+                      width:"100%",height:8,appearance:"none",WebkitAppearance:"none",
+                      background:`linear-gradient(90deg, ${T.red}, ${T.accent}, ${T.teal})`,
+                      borderRadius:99,outline:"none",cursor:"pointer",
+                    }}
+                  />
+                  <style>{`
+                    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:${MOODS[sliderIndex]?.color||T.accent};border:3px solid #fff;box-shadow:0 0 12px ${MOODS[sliderIndex]?.color||T.accent}80;cursor:pointer;transition:all .2s}
+                    input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:${MOODS[sliderIndex]?.color||T.accent};border:3px solid #fff;box-shadow:0 0 12px ${MOODS[sliderIndex]?.color||T.accent}80;cursor:pointer}
+                  `}</style>
                 </div>
 
-                {/* Sub-emotion cards */}
-                <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
-                  {MOODS.filter(m => (m as any).tier === selectedTier.id).map((m, i) => {
-                    const isSelected = selectedMood?.id === m.id;
-                    return (
-                      <button key={m.id} onClick={()=>selectMood(m)} className={`reason-card anim-fadeUp anim-d${i+1}`} style={{
-                        display:"flex",alignItems:"center",gap:12,padding:"14px 16px",
-                        background:isSelected ? `${m.color}15` : T.card,
-                        border:`2px solid ${isSelected ? m.color : T.border}`,
-                        borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",
-                        transition:"all .2s",
-                      }}>
-                        <img src={MOOD_MONKEY[m.id]} alt={m.label} style={{width:48,height:48,objectFit:"contain",borderRadius:12}} loading="lazy" />
-                        <div style={{flex:1}}>
-                          <div style={{color:isSelected ? m.color : T.t1,fontSize:16,fontWeight:800}}>{m.label}</div>
-                          <div style={{color:T.t2,fontSize:12,marginTop:1}}>{m.sub}</div>
-                        </div>
-                        {isSelected && <span style={{color:m.color,fontSize:20}}>✓</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Intensity — only shows after picking sub-emotion */}
-                {selectedMood && (
-                  <div className="anim-fadeUp" style={{padding:20,background:T.card,border:`1px solid ${selectedMood.color}20`,borderRadius:20,marginBottom:16}}>
-                    <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:12,textAlign:"center"}}>Jak moc to cítíš?</div>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                      <span style={{color:T.t2,fontSize:22}}>😌</span>
-                      <div style={{flex:1,display:"flex",gap:6}}>
-                        {[1,2,3,4,5].map(n => (
-                          <button key={n} onClick={()=>setIntensity(n)}
-                            style={{
-                              flex:1,height:44,borderRadius:12,
-                              background:intensity===n ? `${selectedMood.color}30` : intensity >= n ? `${selectedMood.color}10` : "transparent",
-                              border:`2px solid ${intensity>=n ? selectedMood.color : T.border}`,
-                              color:intensity>=n ? selectedMood.color : T.t3,
-                              fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit",
-                              transition:"all .2s",
-                            }}>{n}</button>
-                        ))}
-                      </div>
-                      <span style={{color:T.t2,fontSize:22}}>🔥</span>
+                {/* Intensity */}
+                <div className="anim-fadeUp" style={{padding:20,background:T.card,border:`1px solid ${MOODS[sliderIndex]?.color||T.accent}20`,borderRadius:20,marginBottom:16}}>
+                  <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:12,textAlign:"center"}}>Jak moc to cítíš?</div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                    <span style={{color:T.t2,fontSize:22}}>😌</span>
+                    <div style={{flex:1,display:"flex",gap:6}}>
+                      {[1,2,3,4,5].map(n => (
+                        <button key={n} onClick={()=>setIntensity(n)}
+                          style={{
+                            flex:1,height:44,borderRadius:12,
+                            background:intensity===n ? `${MOODS[sliderIndex]?.color||T.accent}30` : intensity >= n ? `${MOODS[sliderIndex]?.color||T.accent}10` : "transparent",
+                            border:`2px solid ${intensity>=n ? MOODS[sliderIndex]?.color||T.accent : T.border}`,
+                            color:intensity>=n ? MOODS[sliderIndex]?.color||T.accent : T.t3,
+                            fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit",
+                            transition:"all .2s",
+                          }}>{n}</button>
+                      ))}
                     </div>
-                    <div style={{color:T.t2,fontSize:13,textAlign:"center"}}>
-                      {intensity <= 2 ? "Lehce to cítíš" : intensity <= 3 ? "Střední intenzita" : intensity === 4 ? "Cítíš to silně" : "Na plný — Goggins mode 💀"}
-                    </div>
+                    <span style={{color:T.t2,fontSize:22}}>🔥</span>
                   </div>
-                )}
+                  <div style={{color:T.t2,fontSize:13,textAlign:"center"}}>
+                    {intensity <= 2 ? "Lehce to cítíš" : intensity <= 3 ? "Střední intenzita" : intensity === 4 ? "Cítíš to silně" : "Na plný — Goggins mode 💀"}
+                  </div>
+                </div>
 
                 {/* Peer echo */}
-                {selectedMood && Object.values(peerEcho).reduce((a,b)=>a+b,0) > 0 && (
-                  <div className="anim-fadeUp" style={{padding:12,background:`${selectedMood.color}08`,border:`1px solid ${selectedMood.color}15`,borderRadius:12,marginBottom:16,textAlign:"center"}}>
-                    <span style={{color:selectedMood.color,fontSize:14,fontWeight:700}}>
-                      {peerEcho[selectedMood.id] || 0} opičích válečníků cítí {selectedMood.label.toLowerCase()} dnes
+                {Object.values(peerEcho).reduce((a,b)=>a+b,0) > 0 && (
+                  <div className="anim-fadeUp" style={{padding:12,background:`${MOODS[sliderIndex]?.color||T.accent}08`,border:`1px solid ${MOODS[sliderIndex]?.color||T.accent}15`,borderRadius:12,marginBottom:16,textAlign:"center"}}>
+                    <span style={{color:MOODS[sliderIndex]?.color||T.accent,fontSize:14,fontWeight:700}}>
+                      {peerEcho[MOODS[sliderIndex]?.id] || 0} opičích válečníků cítí {MOODS[sliderIndex]?.label.toLowerCase()} dnes
                     </span>
                     <div style={{color:T.t3,fontSize:11,marginTop:2}}>Nejsi v tom sám/a 🐵</div>
                   </div>
                 )}
 
-                {/* Continue button */}
-                {selectedMood && (
-                  <button onClick={confirmSubMood} className="reason-card" style={{width:"100%",padding:"16px 0",background:`linear-gradient(135deg, ${selectedMood.color}25, ${selectedMood.color}10)`,border:`1px solid ${selectedMood.color}35`,borderRadius:16,color:selectedMood.color,fontSize:17,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>
-                    Pokračuj →
-                  </button>
-                )}
+                {/* Continue */}
+                <button onClick={()=>{setSelectedMood(MOODS[sliderIndex]);confirmMood()}} className="reason-card" style={{width:"100%",padding:"16px 0",background:`linear-gradient(135deg, ${MOODS[sliderIndex]?.color||T.accent}25, ${MOODS[sliderIndex]?.color||T.accent}10)`,border:`1px solid ${MOODS[sliderIndex]?.color||T.accent}35`,borderRadius:16,color:MOODS[sliderIndex]?.color||T.accent,fontSize:17,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>
+                  Pokračuj →
+                </button>
               </>
             )}
 
-            {/* STEP 3 — why */}
-            {step === 3 && (
+            {/* STEP 2 — why */}
+            {step === 2 && (
               <>
                 <button onClick={()=>setStep(2)} style={{background:"none",border:"none",color:T.t2,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12,display:"flex",alignItems:"center",gap:4}}>← Zpět</button>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
