@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useCloudData } from "@/hooks/useCloudData";
 import Onboarding from "@/components/Onboarding";
@@ -310,28 +310,125 @@ function MonkeyShortPlayer({
   item: ContentItem;
   onClose: () => void;
 }) {
-  const lines = item.shortLines && item.shortLines.length > 0 ? item.shortLines : [item.hook];
+  const lines = useMemo(
+    () => (item.shortLines && item.shortLines.length > 0 ? item.shortLines : [item.hook]),
+    [item.hook, item.shortLines]
+  );
   const [lineIndex, setLineIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voicePlaying, setVoicePlaying] = useState(false);
   const shortVisual = getShortVisual(item);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const timersRef = useRef<number[]>([]);
+
+  const clearCaptionTimers = useCallback(() => {
+    timersRef.current.forEach((timer) => window.clearTimeout(timer));
+    timersRef.current = [];
+  }, []);
+
+  const runCaptionSequence = useCallback((totalMs: number) => {
+    clearCaptionTimers();
+    setLineIndex(0);
+    if (lines.length <= 1) return;
+    const wordCounts = lines.map((line) => Math.max(1, line.trim().split(/\s+/).length));
+    const totalWords = wordCounts.reduce((sum, count) => sum + count, 0);
+    let elapsed = 0;
+    for (let i = 1; i < lines.length; i += 1) {
+      elapsed += (wordCounts[i - 1] / totalWords) * totalMs;
+      const timer = window.setTimeout(() => setLineIndex(i), elapsed);
+      timersRef.current.push(timer);
+    }
+  }, [clearCaptionTimers, lines]);
 
   useEffect(() => {
-    if (!playing || lines.length <= 1) return;
-    const stepMs = Math.max(1800, Math.round((item.durationSeconds * 1000) / lines.length));
-    const interval = setInterval(() => {
-      setLineIndex((prev) => {
-        if (prev >= lines.length - 1) {
-          clearInterval(interval);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, stepMs);
-    return () => clearInterval(interval);
-  }, [item.durationSeconds, lines.length, playing]);
+    if (!playing || voicePlaying) return;
+    const totalMs = item.durationSeconds * 1000;
+    runCaptionSequence(totalMs);
+    const endTimer = window.setTimeout(() => setLineIndex(lines.length - 1), totalMs);
+    timersRef.current.push(endTimer);
+    return () => clearCaptionTimers();
+  }, [clearCaptionTimers, item.durationSeconds, lines.length, playing, runCaptionSequence, voicePlaying]);
+
+  useEffect(() => {
+    return () => {
+      clearCaptionTimers();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [clearCaptionTimers]);
 
   const progress = ((lineIndex + 1) / lines.length) * 100;
   const fullText = item.text || lines.join(" ");
+  const shareText = `${item.title}\n\n${lines[lineIndex]}\n\nMonkey Mind`;
+
+  const playVoice = async () => {
+    if (voicePlaying && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+      setVoicePlaying(false);
+      setVoiceLoading(false);
+      clearCaptionTimers();
+      setLineIndex(0);
+      return;
+    }
+
+    setVoiceError(null);
+    setVoiceLoading(true);
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ text: fullText, emotion: item.emotion || "all" }),
+      });
+      if (!response.ok) throw new Error("TTS failed");
+      const audioBlob = await response.blob();
+      if (audioBlob.size < 1000) throw new Error("Empty audio");
+      const url = URL.createObjectURL(audioBlob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => {
+        setVoicePlaying(false);
+        setVoiceLoading(false);
+      };
+      audio.onerror = () => {
+        setVoicePlaying(false);
+        setVoiceLoading(false);
+        setVoiceError("Prémiový hlas teď není dostupný.");
+      };
+      await new Promise<void>((resolve) => {
+        audio.onloadedmetadata = () => resolve();
+      });
+      runCaptionSequence((audio.duration || item.durationSeconds) * 1000);
+      await audio.play();
+      setVoicePlaying(true);
+      setVoiceLoading(false);
+    } catch (error) {
+      console.error("Monkey short voice failed", error);
+      setVoiceLoading(false);
+      setVoicePlaying(false);
+      setVoiceError("Prémiový hlas se nepodařilo načíst. Zkus to prosím znovu.");
+    }
+  };
+
+  const shareShort = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: item.title,
+          text: shareText,
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(shareText);
+    } catch (error) {
+      console.error("Share failed", error);
+    }
+  };
 
   return (
     <div style={{width:"100%",borderRadius:24,overflow:"hidden",background:shortVisual.gradient,border:`1px solid ${shortVisual.glow}55`,boxShadow:`0 16px 40px ${shortVisual.glow}25`,position:"relative",marginTop:12}}>
@@ -371,14 +468,18 @@ function MonkeyShortPlayer({
             </div>
           </div>
 
-          <div style={{display:"flex",gap:10,width:"100%",marginTop:10}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,width:"100%",marginTop:10}}>
             <button onClick={() => setPlaying((prev) => !prev)} style={{flex:1,padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
               {playing ? "⏸ Pauza" : "▶ Pokračovat"}
             </button>
-            <div style={{flex:1}}>
-              <SpeechPlayer text={fullText} label="Přehrát hlas" speechId={`short-${item.id}`} emotion={item.emotion || "all"} />
-            </div>
+            <button onClick={playVoice} style={{flex:1,padding:"11px 14px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+              {voiceLoading ? "⏳ Načítám hlas" : voicePlaying ? "■ Zastavit hlas" : "🔊 Přehrát prémiový hlas"}
+            </button>
+            <button onClick={shareShort} style={{gridColumn:"1 / -1",padding:"11px 14px",background:T.tealDim,border:`1px solid ${T.teal}30`,borderRadius:14,color:T.teal,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+              📤 Sdílet / zkopírovat short quote
+            </button>
           </div>
+          {voiceError && <div style={{marginTop:10,color:T.red,fontSize:12,fontWeight:700,textAlign:"center"}}>{voiceError}</div>}
         </div>
       </div>
     </div>
