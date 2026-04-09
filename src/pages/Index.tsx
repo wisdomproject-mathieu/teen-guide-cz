@@ -1105,8 +1105,6 @@ export default function Index() {
   const [peerEcho, setPeerEcho] = useState<Record<string, number>>({});
   const [shareCard, setShareCard] = useState<{quote:string;rank:string;mood:string}|null>(null);
   const [recs, setRecs] = useState<any>(null);
-  const [shareCard, setShareCard] = useState<{quote:string;rank:string;mood:string}|null>(null);
-  const [recs, setRecs] = useState<any>(null);
 
   const requirePremium = (feature: string) => {
     if (premium.isPremium) return false;
