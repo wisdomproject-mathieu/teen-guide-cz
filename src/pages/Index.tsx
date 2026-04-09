@@ -411,22 +411,9 @@ function MonkeyShortPlayer({
         setPlaying(false);
         setVoiceError("Prémiový hlas teď není dostupný.");
       };
-      await new Promise<void>((resolve, reject) => {
-        const timeout = window.setTimeout(() => reject(new Error("Audio load timeout")), 8000);
-        const finish = () => {
-          window.clearTimeout(timeout);
-          resolve();
-        };
-        audio.onloadedmetadata = finish;
-        audio.oncanplaythrough = finish;
-        audio.onerror = () => {
-          window.clearTimeout(timeout);
-          reject(new Error("Audio load failed"));
-        };
-      });
       setLineIndex(0);
       setPlaying(true);
-      runCaptionSequence((audio.duration || item.durationSeconds) * 1000);
+      runCaptionSequence(item.durationSeconds * 1000);
       await audio.play();
       setVoicePlaying(true);
       setVoiceLoading(false);
