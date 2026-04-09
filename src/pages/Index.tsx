@@ -1059,12 +1059,18 @@ export default function Index() {
     if (!cloudLoading && !userName) setShowOnboarding(true);
   }, [cloudLoading, userName]);
 
+  useEffect(() => {
+    if (!selectedMood) {
+      setSelectedMood(MOODS[2]);
+    }
+  }, [selectedMood]);
+
   const handleOnboardingComplete = (newName: string, moodId: string) => {
     cloud.updateName(newName);
     const mood = MOODS.find((m) => m.id === moodId);
     if (mood) {
       setSelectedMood(mood);
-      setStep(2); // go to reason selection
+      setStep(1);
     }
     setShowOnboarding(false);
   };
@@ -1105,7 +1111,7 @@ export default function Index() {
   };
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
-  const selectMood = (m: MoodOption) => { setSelectedMood(m); setStep(2); };
+  const selectMood = (m: MoodOption) => { setSelectedMood(m); setStep(1); };
   const selectReason = (r: ReasonOption) => {
     if (!selectedMood) return;
     setSelectedReason(r);
@@ -1217,46 +1223,64 @@ export default function Index() {
               )}
             </div>
 
-            {/* STEP 1 — mood grid */}
-            {step === 1 && (
+            {step !== 3 && selectedMood && (
               <>
                 <InAppNotifications lastCheckinDate={lastCheckinDate} streakCount={streakCount} userName={userName} onNavigate={(t) => { setTab(t); resetFlow(); }} />
-                <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:14,marginBottom:16,padding:16,background:`linear-gradient(135deg, ${T.accent}15, transparent)`,borderRadius:20,border:`1px solid ${T.accent}20`}}>
-                  <img src={monkeyHero} alt="" className="tab-monkey" style={{width:64,height:64,objectFit:"contain"}} />
-                  <div>
-                    <div style={{color:T.t1,fontSize:22,fontWeight:900,letterSpacing:-0.5}}>Jak se cítíš?</div>
-                    <div style={{color:T.t2,fontSize:13,marginTop:2}}>Vyber náladu — tvoje opice ti poradí</div>
+                <div className="anim-fadeUp" style={{marginBottom:16,padding:18,background:`linear-gradient(135deg, ${selectedMood.color}18, transparent)`,borderRadius:22,border:`1px solid ${selectedMood.color}25`}}>
+                  <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
+                    <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" className="tab-monkey" style={{width:68,height:68,objectFit:"contain"}} />
+                    <div>
+                      <div style={{color:T.t1,fontSize:22,fontWeight:900,letterSpacing:-0.5}}>Jak se cítíš?</div>
+                      <div style={{color:T.t2,fontSize:13,marginTop:3}}>Posuň slider a hned dole vyber proč</div>
+                    </div>
                   </div>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  {MOODS.map((m, i) => (
-                    <button key={m.id} onClick={()=>selectMood(m)} className={`reason-card anim-fadeUp anim-d${i+1}`} style={{display:"flex",alignItems:"center",gap:10,padding:12,background:`linear-gradient(135deg, ${m.color}08, transparent)`,border:`1px solid ${m.color}20`,borderRadius:14,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
-                      <img src={MOOD_MONKEY[m.id]} alt={m.label} style={{width:44,height:44,objectFit:"contain",borderRadius:10}} loading="lazy" />
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{color:T.t1,fontSize:14,fontWeight:800}}>{m.label}</div>
-                        <div style={{color:T.t2,fontSize:10,marginTop:1}}>{m.sub}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
 
-            {/* STEP 2 — why */}
-            {step === 2 && (
-              <>
-                <button onClick={()=>{setStep(1);setSelectedMood(null)}} style={{background:"none",border:"none",color:T.t2,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12,display:"flex",alignItems:"center",gap:4}}>← Zpět</button>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
-                  <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
-                  <div>
-                    <div style={{color:T.t1,fontSize:15,fontWeight:700}}>Cítíš se: {selectedMood.label}</div>
-                    <div style={{color:T.t2,fontSize:12}}>Co za tím stojí?</div>
+                  <div style={{padding:"16px 14px",background:"rgba(255,255,255,0.03)",border:`1px solid ${selectedMood.color}20`,borderRadius:18,marginBottom:14}}>
+                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+                      <span style={{color:selectedMood.color,fontSize:28,fontWeight:900}}>{MOODS.findIndex((m) => m.id === selectedMood.id) + 1}</span>
+                      <div>
+                        <div style={{color:T.t1,fontSize:18,fontWeight:800}}>{selectedMood.label}</div>
+                        <div style={{color:T.t2,fontSize:12}}>{selectedMood.sub}</div>
+                      </div>
+                    </div>
+
+                    <input
+                      type="range"
+                      min={0}
+                      max={MOODS.length - 1}
+                      step={1}
+                      value={MOODS.findIndex((m) => m.id === selectedMood.id)}
+                      onChange={(e) => selectMood(MOODS[Number(e.target.value)])}
+                      style={{width:"100%",accentColor:selectedMood.color,cursor:"pointer"}}
+                    />
+
+                    <div style={{display:"flex",justifyContent:"space-between",marginTop:8,color:T.t3,fontSize:10,fontWeight:700}}>
+                      <span>Skvěle</span>
+                      <span>Tak nějak</span>
+                      <span>Na dně</span>
+                    </div>
+                  </div>
+
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
+                    {MOODS.map((m) => {
+                      const active = m.id === selectedMood.id;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => selectMood(m)}
+                          style={{padding:"8px 0",background:active?`${m.color}18`:T.card,border:`1px solid ${active?m.color:T.border}`,borderRadius:12,color:active?m.color:T.t3,fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+                        >
+                          {m.label.split("/")[0]}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
+
                 <div style={{color:T.t1,fontSize:18,fontWeight:800,marginBottom:4}}>Proč nebo co cítíš?</div>
-                <div style={{color:T.t2,fontSize:12,marginBottom:16}}>Vyber co je nejblíž — opice najde co ti pomůže</div>
+                <div style={{color:T.t2,fontSize:12,marginBottom:16}}>Jedním klikem vyber, co je tomu nejblíž</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  {REASONS.map(r => (
+                  {REASONS.map((r) => (
                     <button key={r.id} onClick={()=>selectReason(r)} className="reason-card" style={{display:"flex",alignItems:"center",gap:10,padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
                       <img src={REASON_MONKEY[r.id]} alt={r.label} style={{width:40,height:40,objectFit:"contain",borderRadius:8}} loading="lazy" />
                       <div style={{flex:1}}>
