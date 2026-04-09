@@ -104,9 +104,24 @@ type WebkitAudioWindow = Window & typeof globalThis & { webkitAudioContext?: typ
 function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: string; speechId: string; emotion: string}) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  const stopPlayback = () => {
+    audioRef.current?.pause();
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
+    if (synthRef.current) {
+      window.speechSynthesis.cancel();
+      synthRef.current = null;
+    }
+    setPlaying(false);
+  };
+
   const play = async () => {
-    if (playing) { audioRef.current?.pause(); setPlaying(false); return; }
+    if (playing) { stopPlayback(); return; }
     let audioUrl = audioCache.get(speechId);
     if (!audioUrl) {
       setLoading(true);
@@ -119,24 +134,30 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
         const audioBlob = await response.blob();
         audioUrl = URL.createObjectURL(audioBlob);
         audioCache.set(speechId, audioUrl);
+        setUsingFallback(false);
       } catch {
         setLoading(false);
         const u = new SpeechSynthesisUtterance(text); u.lang = "cs-CZ"; u.rate = 0.82;
-        u.onend = () => setPlaying(false); u.onerror = () => setPlaying(false);
+        synthRef.current = u;
+        setUsingFallback(true);
+        u.onend = () => { synthRef.current = null; setPlaying(false); };
+        u.onerror = () => { synthRef.current = null; setPlaying(false); };
         setPlaying(true); window.speechSynthesis.speak(u); return;
       }
       setLoading(false);
     }
     const audio = new Audio(audioUrl); audioRef.current = audio;
     audio.onended = () => setPlaying(false); audio.onerror = () => setPlaying(false);
-    setPlaying(true); audio.play();
+    setUsingFallback(false);
+    setPlaying(true);
+    audio.play().catch(() => setPlaying(false));
   };
-  useEffect(() => { return () => { audioRef.current?.pause(); window.speechSynthesis.cancel(); }; }, []);
+  useEffect(() => { return () => { stopPlayback(); }; }, []);
   return (
     <button onClick={play} disabled={loading} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:12,cursor:loading?"wait":"pointer",fontFamily:"inherit",width:"100%"}}>
       <span style={{fontSize:18,color:T.accent}}>{loading?"⏳":playing?"■":"▶"}</span>
-      <span style={{color:T.t1,fontSize:13,fontWeight:600}}>{loading?"Generuji hlas...":label}</span>
-      {playing && <span style={{color:T.accent,fontSize:11,marginLeft:"auto"}}>🔊 Hraje</span>}
+      <span style={{color:T.t1,fontSize:13,fontWeight:600}}>{loading?"Generuji hlas...":usingFallback?"Nouzový hlas":label}</span>
+      {playing && <span style={{color:T.accent,fontSize:11,marginLeft:"auto"}}>{usingFallback?"🤖 Robot":"🔊 Hraje"}</span>}
     </button>
   );
 }
@@ -1236,8 +1257,13 @@ export default function Index() {
                   </div>
 
                   <div style={{padding:"16px 14px",background:"rgba(255,255,255,0.03)",border:`1px solid ${selectedMood.color}20`,borderRadius:18,marginBottom:14}}>
+                    {(() => {
+                      const selectedMoodIndex = MOODS.findIndex((m) => m.id === selectedMood.id);
+                      const sliderValue = MOODS.length - 1 - selectedMoodIndex;
+                      return (
+                        <>
                     <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
-                      <span style={{color:selectedMood.color,fontSize:28,fontWeight:900}}>{MOODS.findIndex((m) => m.id === selectedMood.id) + 1}</span>
+                      <span style={{color:selectedMood.color,fontSize:28,fontWeight:900}}>{selectedMoodIndex + 1}</span>
                       <div>
                         <div style={{color:T.t1,fontSize:18,fontWeight:800}}>{selectedMood.label}</div>
                         <div style={{color:T.t2,fontSize:12}}>{selectedMood.sub}</div>
@@ -1249,16 +1275,19 @@ export default function Index() {
                       min={0}
                       max={MOODS.length - 1}
                       step={1}
-                      value={MOODS.findIndex((m) => m.id === selectedMood.id)}
-                      onChange={(e) => selectMood(MOODS[Number(e.target.value)])}
+                      value={sliderValue}
+                      onChange={(e) => selectMood(MOODS[MOODS.length - 1 - Number(e.target.value)])}
                       style={{width:"100%",accentColor:selectedMood.color,cursor:"pointer"}}
                     />
 
                     <div style={{display:"flex",justifyContent:"space-between",marginTop:8,color:T.t3,fontSize:10,fontWeight:700}}>
-                      <span>Skvěle</span>
-                      <span>Tak nějak</span>
                       <span>Na dně</span>
+                      <span>Tak nějak</span>
+                      <span>Skvěle</span>
                     </div>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
