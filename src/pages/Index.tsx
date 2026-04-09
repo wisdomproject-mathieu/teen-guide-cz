@@ -206,6 +206,60 @@ function PremiumLockCard({
   );
 }
 
+function UpgradeScreen({ onCopyAsk }: { onCopyAsk: () => void }) {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{background:`linear-gradient(135deg, ${T.accent}16, ${T.purple}10)`,border:`1px solid ${T.accent}30`,borderRadius:22,padding:20}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+          <span style={{fontSize:20}}>👑</span>
+          <span style={{color:T.accent,fontSize:12,fontWeight:900,letterSpacing:0.6}}>MONKEY PREMIUM</span>
+        </div>
+        <div style={{color:T.t1,fontSize:24,fontWeight:900,marginBottom:6}}>799 Kč / rok</div>
+        <div style={{color:T.t2,fontSize:13,lineHeight:1.65}}>
+          Aplikace, za kterou budou rodiče nejspíš rádi platit, protože nepřidává další chaos. Pomáhá ti zklidnit hlavu, zvládat konflikty a mít doma méně výbuchů.
+        </div>
+      </div>
+
+      <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:18,padding:18}}>
+        <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:10}}>Co premium opravdu odemyká</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {[
+            "AI Opičák bez limitu, když se to sype večer nebo po hádce",
+            "SOS hudba podle nálady a intenzity",
+            "Prémiové rage packy, Monkey shorts a hlubší knihovna",
+            "Pokročilé insighty a lepší doporučení podle historie",
+          ].map((line) => (
+            <div key={line} style={{display:"flex",gap:8,color:T.t2,fontSize:12,lineHeight:1.55}}>
+              <span style={{color:T.teal}}>✓</span>
+              <span>{line}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{background:`linear-gradient(135deg, ${T.blue}10, ${T.teal}08)`,border:`1px solid ${T.blue}25`,borderRadius:18,padding:18}}>
+        <div style={{color:T.t1,fontSize:15,fontWeight:800,marginBottom:8}}>Jak to říct rodičům</div>
+        <div style={{color:T.t2,fontSize:12,lineHeight:1.65,marginBottom:12}}>
+          Ne tlak. Ne guilt trip. Jen normální zpráva o tom, že ti to pomáhá.
+        </div>
+        <div style={{padding:12,background:"rgba(255,255,255,0.03)",border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,fontSize:12,lineHeight:1.65,marginBottom:12}}>
+          Ahoj, tahle appka mi fakt pomáhá uklidnit se, když mám stres nebo hádku. Premium stojí 799 Kč na rok a má chat, lepší obsah a SOS věci navíc. Myslím, že by mi to reálně pomohlo být víc v klidu doma i ve škole. Mohli bychom to prosím zkusit?
+        </div>
+        <button
+          onClick={onCopyAsk}
+          style={{width:"100%",padding:"12px 16px",background:T.tealDim,border:`1px solid ${T.teal}35`,borderRadius:14,color:T.teal,fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+        >
+          Zkopírovat zprávu pro rodiče
+        </button>
+      </div>
+
+      <div style={{color:T.t3,fontSize:11,lineHeight:1.6,textAlign:"center"}}>
+        Silný pitch ano. Manipulace ne. Ta appka má rodičům dávat smysl, ne je tlačit.
+      </div>
+    </div>
+  );
+}
+
 function toEmbedUrl(url: string) {
   const match = url.match(/(?:v=|youtu\.be\/)([^?&]+)/);
   return match ? `https://www.youtube.com/embed/${match[1]}` : url;
@@ -836,18 +890,20 @@ function ProfileTab({
   onSignOut,
   onUpgrade,
   onOpenChat,
+  onCopyAsk,
 }: {
   moodLog: MoodLogEntry[];
   streakCount: number;
   userName: string;
   avatar: string | null;
   subscriptionTier: SubscriptionTier;
-  initialSection?: "overview" | "library" | "insights" | "contacts" | "diary" | "calendar";
+  initialSection?: "overview" | "premium" | "library" | "insights" | "contacts" | "diary" | "calendar";
   onNameChange: (n: string) => void;
   onAvatarClick: () => void;
   onSignOut: () => void;
   onUpgrade: () => void;
   onOpenChat: (prompt: string) => void;
+  onCopyAsk: () => void;
 }) {
   const [activeSection, setActiveSection] = useState(initialSection || "overview");
   const [contacts, setContacts] = useState([{name:"",phone:""}]);
@@ -915,10 +971,14 @@ function ProfileTab({
 
       {/* Section pills */}
       <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:16,paddingBottom:4}}>
-        {[{id:"overview",label:"📊 Přehled"},{id:"library",label:"🎬 Obsah"},{id:"insights",label:"🧠 Insights"},{id:"contacts",label:"📞 SOS"},{id:"diary",label:"📝 Deník"},{id:"calendar",label:"📅 Historie"}].map(s=>
+        {[{id:"overview",label:"📊 Přehled"},{id:"premium",label:"👑 Premium"},{id:"library",label:"🎬 Obsah"},{id:"insights",label:"🧠 Insights"},{id:"contacts",label:"📞 SOS"},{id:"diary",label:"📝 Deník"},{id:"calendar",label:"📅 Historie"}].map(s=>
           <button key={s.id} onClick={()=>setActiveSection(s.id)} className="reason-card" style={{padding:"8px 14px",background:activeSection===s.id?T.accentDim:T.card,border:`1px solid ${activeSection===s.id?T.accent:T.border}`,borderRadius:99,color:activeSection===s.id?T.accent:T.t2,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",flexShrink:0}}>{s.label}</button>
         )}
       </div>
+
+      {activeSection==="premium" && (
+        <UpgradeScreen onCopyAsk={onCopyAsk} />
+      )}
 
       {activeSection==="overview" && (
         <div>
@@ -1408,7 +1468,7 @@ export default function Index() {
   const [selectedReason, setSelectedReason] = useState<ReasonOption | null>(null);
   const [recs, setRecs] = useState<RecommendationBundle | null>(null);
   const isPremium = subscriptionTier === "premium";
-  const [profileSection, setProfileSection] = useState<"overview"|"library"|"insights"|"contacts"|"diary"|"calendar">("overview");
+  const [profileSection, setProfileSection] = useState<"overview"|"premium"|"library"|"insights"|"contacts"|"diary"|"calendar">("overview");
   const [chatSeed, setChatSeed] = useState<string | null>(null);
 
   // Show onboarding for new users (no name set yet)
@@ -1435,11 +1495,21 @@ export default function Index() {
   const handleNameChange = (n: string) => { cloud.updateName(n); };
   const openUpgrade = () => {
     setTab("profile");
-    setProfileSection("overview");
+    setProfileSection("premium");
   };
   const openChatWithPrompt = (prompt: string) => {
     setChatSeed(prompt);
     setTab("chat");
+  };
+  const copyParentAsk = async () => {
+    const text = "Ahoj, tahle appka mi fakt pomáhá uklidnit se, když mám stres nebo hádku. Premium stojí 799 Kč na rok a má chat, lepší obsah a SOS věci navíc. Myslím, že by mi to reálně pomohlo být víc v klidu doma i ve škole. Mohli bychom to prosím zkusit?";
+    try {
+      await navigator.clipboard.writeText(text);
+      setXpPopup({ xp: 0, label: "Zpráva pro rodiče zkopírována" });
+    } catch (error) {
+      console.error("Copy failed", error);
+      setXpPopup({ xp: 0, label: "Kopírování se nepovedlo" });
+    }
   };
   const handleAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -1761,6 +1831,16 @@ export default function Index() {
                   </div>
                 </button>
 
+                {!isPremium && (
+                  <button onClick={openUpgrade} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.accent}12, ${T.teal}08)`,border:`1px solid ${T.accent}30`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:20}}>
+                    <img src={monkeyProfile} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
+                    <div>
+                      <div style={{color:T.t1,fontSize:15,fontWeight:800}}>👑 Premium za 799 Kč / rok</div>
+                      <div style={{color:T.t2,fontSize:12}}>Pitch pro rodiče, chat, SOS hudba a silnější obsah navíc</div>
+                    </div>
+                  </button>
+                )}
+
                 {/* Quests CTA */}
                 <button onClick={()=>setTab("quests")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.accent}08, ${T.purple}08)`,border:`1px solid ${T.accent}20`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:20}}>
                   <img src={monkeyQuests} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
@@ -1803,6 +1883,7 @@ export default function Index() {
             onSignOut={signOut}
             onUpgrade={openUpgrade}
             onOpenChat={openChatWithPrompt}
+            onCopyAsk={copyParentAsk}
           />
         )}
       </div>
