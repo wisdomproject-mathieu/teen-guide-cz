@@ -124,6 +124,16 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
     setPlaying(false);
   };
 
+  const extractResponseError = async (response: Response) => {
+    const raw = await response.text();
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed.details || parsed.error || raw;
+    } catch {
+      return raw;
+    }
+  };
+
   const play = async () => {
     if (playing) { stopPlayback(); return; }
     let audioUrl = audioCache.get(speechId);
@@ -135,9 +145,15 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
           method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
           body: JSON.stringify({ text, emotion }),
         });
-        if (!response.ok) throw new Error(`TTS failed`);
+        if (!response.ok) {
+          const detail = await extractResponseError(response);
+          throw new Error(detail || "TTS failed");
+        }
         const contentType = response.headers.get("content-type") || "";
-        if (!contentType.includes("audio")) throw new Error(`Unexpected content type: ${contentType}`);
+        if (!contentType.includes("audio")) {
+          const detail = await extractResponseError(response.clone());
+          throw new Error(detail || `Unexpected content type: ${contentType}`);
+        }
         const audioBlob = await response.blob();
         if (audioBlob.size < 1000) throw new Error("Empty audio");
         audioUrl = URL.createObjectURL(audioBlob);
@@ -147,7 +163,8 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
         console.error("Speech playback failed", err);
         setLoading(false);
         setUsingFallback(true);
-        setError("Prémiový hlas se teď nenačetl. Zkus to prosím znovu.");
+        const message = err instanceof Error ? err.message : "Prémiový hlas se teď nenačetl. Zkus to prosím znovu.";
+        setError(message);
         return;
       }
       setLoading(false);
