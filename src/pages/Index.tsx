@@ -1098,11 +1098,13 @@ export default function Index() {
   const [xpPopup, setXpPopup] = useState<{xp:number;label:string}|null>(null);
   const [levelUp, setLevelUp] = useState<{level:number;skin?:typeof MONKEY_SKINS[0]|null}|null>(null);
   const [step, setStep] = useState(1);
-  const [selectedTier, setSelectedTier] = useState<typeof MOOD_TIERS[0]|null>(null);
+  const [sliderIndex, setSliderIndex] = useState(3); // middle = meh
   const [selectedMood, setSelectedMood] = useState<any>(null);
   const [selectedReason, setSelectedReason] = useState<any>(null);
   const [intensity, setIntensity] = useState(3);
   const [peerEcho, setPeerEcho] = useState<Record<string, number>>({});
+  const [shareCard, setShareCard] = useState<{quote:string;rank:string;mood:string}|null>(null);
+  const [recs, setRecs] = useState<any>(null);
   const [shareCard, setShareCard] = useState<{quote:string;rank:string;mood:string}|null>(null);
   const [recs, setRecs] = useState<any>(null);
 
