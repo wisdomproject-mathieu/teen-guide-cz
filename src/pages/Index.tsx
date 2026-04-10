@@ -1868,12 +1868,8 @@ export default function Index() {
     }
   }, [selectedMood]);
 
-  const handleOnboardingComplete = (newName: string, moodId: string) => {
-    cloud.updateName(newName);
-    const mood = MOODS.find((m) => m.id === moodId);
-    if (mood) {
-      setSelectedMood(mood);
-      setStep(1);
+  // Fetch anonymous peer echo
+  useEffect(() => {
     supabase.rpc("get_today_mood_counts").then(({ data }) => {
       if (data) {
         const counts: Record<string, number> = {};
