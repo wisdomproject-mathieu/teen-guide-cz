@@ -1,4 +1,4 @@
-# Monkey Mind Content System
+ # Monkey Mind Content System
 
 ## Purpose
 

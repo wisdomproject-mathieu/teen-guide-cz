@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useCloudData } from "@/hooks/useCloudData";
@@ -123,16 +122,11 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
   const [usingFallback, setUsingFallback] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const stopPlayback = () => {
     audioRef.current?.pause();
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
-    }
-    if (synthRef.current) {
-      window.speechSynthesis.cancel();
-      synthRef.current = null;
     }
     setPlaying(false);
   };
@@ -148,11 +142,9 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
   };
 
   const play = async () => {
-    if (playing) { stopPlayback(); return; }
-    let audioUrl = audioCache.get(speechId);
-    if (playing) { audioRef.current?.pause(); setPlaying(false); return; }
     const cacheKey = `${speechId}-i${intensity||3}`;
     let audioUrl = audioCache.get(cacheKey);
+    if (playing) { stopPlayback(); return; }
     if (!audioUrl) {
       setLoading(true);
       setError(null);
@@ -167,24 +159,16 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
         }
         const contentType = response.headers.get("content-type") || "";
         if (!contentType.includes("audio")) {
-          const detail = await extractResponseError(response.clone());
+          const detail = await response.text();
           throw new Error(detail || `Unexpected content type: ${contentType}`);
         }
-        const contentType = response.headers.get("Content-Type") || "";
-        if (contentType.includes("application/json")) {
-          const data = await response.json();
-          if (data.fallback || data.error) throw new Error(data.error || "TTS unavailable");
-        }
-        if (!response.ok) throw new Error(`TTS failed`);
         const audioBlob = await response.blob();
         if (audioBlob.size < 1000) throw new Error("Empty audio");
         audioUrl = URL.createObjectURL(audioBlob);
-        audioCache.set(speechId, audioUrl);
+        setCachedAudio(cacheKey, audioUrl);
         setUsingFallback(false);
       } catch (err) {
         console.error("Speech playback failed", err);
-        setCachedAudio(cacheKey, audioUrl);
-      } catch {
         setLoading(false);
         setUsingFallback(true);
         const message = err instanceof Error ? err.message : "Prémiový hlas se teď nenačetl. Zkus to prosím znovu.";
@@ -1250,6 +1234,11 @@ function ProfileTab({
   onNameChange,
   onAvatarClick,
   onSignOut,
+  diaryEntries,
+  sosContacts,
+  onSaveDiary,
+  onSaveContacts,
+  onCompleteQuest,
   onUpgrade,
   onOpenChat,
   onCopyAsk,
@@ -1263,13 +1252,15 @@ function ProfileTab({
   onNameChange: (n: string) => void;
   onAvatarClick: () => void;
   onSignOut: () => void;
+  diaryEntries: any[];
+  sosContacts: { id?: string; name: string; phone: string }[];
+  onSaveDiary: (content: string) => void;
+  onSaveContacts: (contacts: { id?: string; name: string; phone: string }[]) => void;
+  onCompleteQuest: (id: string) => void;
   onUpgrade: () => void;
   onOpenChat: (prompt: string) => void;
   onCopyAsk: () => void;
 }) {
-  const [activeSection, setActiveSection] = useState(initialSection || "overview");
-  const [contacts, setContacts] = useState([{name:"",phone:""}]);
-function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut, diaryEntries, sosContacts, onSaveDiary, onSaveContacts, onCompleteQuest, isPremium, onUpgrade}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void; diaryEntries:any[]; sosContacts:{id?:string;name:string;phone:string}[]; onSaveDiary:(content:string)=>void; onSaveContacts:(contacts:{id?:string;name:string;phone:string}[])=>void; onCompleteQuest:(id:string)=>void; isPremium:boolean; onUpgrade:()=>void}) {
   const [activeSection, setActiveSection] = useState("overview");
   const [contacts, setContacts] = useState<{id?:string;name:string;phone:string}[]>(sosContacts.length > 0 ? sosContacts : [{name:"",phone:""}]);
   const [diary, setDiary] = useState("");
@@ -1618,8 +1609,6 @@ function SOSOverlay({onClose, isPremium, onUpgrade}: {onClose:()=>void; isPremiu
       lofi:  { freqs: [196, 247, 294], type: "triangle", lfoRate: 0.12, filterFreq: 950 },
       rage:  { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
       metal: { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
-      lofi:  { freqs: [196, 247, 294, 370], type: "triangle", lfoRate: 0.05, filterFreq: 500 },
-      rage:  { freqs: [82, 123, 165], type: "sawtooth", lfoRate: 0.5, filterFreq: 1800 },
     };
     const cfg = configs[genre.id] || configs.calm;
 
@@ -1860,7 +1849,6 @@ export default function Index() {
   const cloud = useCloudData();
   const { moodLog, xp, streakCount, completedQuests, equippedSkin, subscriptionTier, userName, lastCheckinDate, loading: cloudLoading } = cloud;
   const premium = usePremium();
-  const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName, lastCheckinDate, loading: cloudLoading } = cloud;
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [tab, setTab] = useState("feel");
@@ -1879,12 +1867,9 @@ export default function Index() {
   const [profileSection, setProfileSection] = useState<"overview"|"premium"|"library"|"insights"|"contacts"|"diary"|"calendar">("overview");
   const [chatSeed, setChatSeed] = useState<string | null>(null);
   const [sliderIndex, setSliderIndex] = useState(3); // middle = meh
-  const [selectedMood, setSelectedMood] = useState<any>(null);
-  const [selectedReason, setSelectedReason] = useState<any>(null);
   const [intensity, setIntensity] = useState(3);
   const [peerEcho, setPeerEcho] = useState<Record<string, number>>({});
   const [shareCard, setShareCard] = useState<{quote:string;rank:string;mood:string}|null>(null);
-  const [recs, setRecs] = useState<any>(null);
 
   const requirePremium = (feature: string) => {
     if (premium.isPremium) return false;
@@ -1909,21 +1894,6 @@ export default function Index() {
     }
   }, [selectedMood]);
 
-  const handleOnboardingComplete = (newName: string, moodId: string) => {
-    cloud.updateName(newName);
-    const mood = MOODS.find((m) => m.id === moodId);
-    if (mood) {
-      setSelectedMood(mood);
-      setStep(1);
-    supabase.rpc("get_today_mood_counts").then(({ data }) => {
-      if (data) {
-        const counts: Record<string, number> = {};
-        (data as any[]).forEach((r: any) => { counts[r.mood_id] = Number(r.count); });
-        setPeerEcho(counts);
-      }
-    });
-  }, [moodLog.length]);
-
   const handleOnboardingComplete = async (newName: string, moodId: string) => {
     if (newName) cloud.updateName(newName);
     const uid = cloud.profile?.id;
@@ -1938,6 +1908,21 @@ export default function Index() {
     }
     setShowOnboarding(false);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.rpc("get_today_mood_counts").then(({ data }) => {
+      if (cancelled || !data) return;
+      const counts: Record<string, number> = {};
+      (data as any[]).forEach((r: any) => {
+        counts[r.mood_id] = Number(r.count);
+      });
+      setPeerEcho(counts);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cloudLoading, moodLog.length]);
 
   const handleNameChange = (n: string) => { cloud.updateName(n); };
   const openUpgrade = () => {
@@ -2099,7 +2084,6 @@ export default function Index() {
       `}</style>
       <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatar} style={{display:"none"}}/>
       {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)} isPremium={isPremium} onUpgrade={openUpgrade} />}
-      {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)}/>}
       {showPaywall && <PaywallOverlay onClose={()=>setShowPaywall(false)} premium={premium} feature={paywallFeature} />}
       {xpPopup && <XpPopup xp={xpPopup.xp} label={xpPopup.label} onDone={() => setXpPopup(null)} />}
       {levelUp && <LevelUpOverlay level={levelUp.level} skin={levelUp.skin} onDone={() => setLevelUp(null)} />}
@@ -2140,65 +2124,6 @@ export default function Index() {
               )}
             </div>
 
-            {step !== 3 && selectedMood && (
-              <>
-                <InAppNotifications lastCheckinDate={lastCheckinDate} streakCount={streakCount} userName={userName} onNavigate={(t) => { setTab(t); resetFlow(); }} />
-                <div className="anim-fadeUp" style={{marginBottom:16,padding:18,background:`linear-gradient(135deg, ${selectedMood.color}18, transparent)`,borderRadius:22,border:`1px solid ${selectedMood.color}25`}}>
-                  <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
-                    <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" className="tab-monkey" style={{width:68,height:68,objectFit:"contain"}} />
-                    <div>
-                      <div style={{color:T.t1,fontSize:22,fontWeight:900,letterSpacing:-0.5}}>Jak se cítíš?</div>
-                      <div style={{color:T.t2,fontSize:13,marginTop:3}}>Posuň slider a hned dole vyber proč</div>
-                    </div>
-                  </div>
-
-                  <div style={{padding:"16px 14px",background:"rgba(255,255,255,0.03)",border:`1px solid ${selectedMood.color}20`,borderRadius:18,marginBottom:14}}>
-                    {(() => {
-                      const selectedMoodIndex = MOODS.findIndex((m) => m.id === selectedMood.id);
-                      const sliderValue = MOODS.length - 1 - selectedMoodIndex;
-                      return (
-                        <>
-                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
-                      <span style={{color:selectedMood.color,fontSize:28,fontWeight:900}}>{selectedMoodIndex + 1}</span>
-                      <div>
-                        <div style={{color:T.t1,fontSize:18,fontWeight:800}}>{selectedMood.label}</div>
-                        <div style={{color:T.t2,fontSize:12}}>{selectedMood.sub}</div>
-                      </div>
-                    </div>
-
-                    <input
-                      type="range"
-                      min={0}
-                      max={MOODS.length - 1}
-                      step={1}
-                      value={sliderValue}
-                      onChange={(e) => selectMood(MOODS[MOODS.length - 1 - Number(e.target.value)])}
-                      style={{width:"100%",accentColor:selectedMood.color,cursor:"pointer"}}
-                    />
-
-                    <div style={{display:"flex",justifyContent:"space-between",marginTop:8,color:T.t3,fontSize:10,fontWeight:700}}>
-                      <span>Na dně</span>
-                      <span>Tak nějak</span>
-                      <span>Skvěle</span>
-                    </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
-                    {[...MOODS].reverse().map((m) => {
-                      const active = m.id === selectedMood.id;
-                      return (
-                        <button
-                          key={m.id}
-                          onClick={() => selectMood(m)}
-                          style={{padding:"8px 0",background:active?`${m.color}18`:T.card,border:`1px solid ${active?m.color:T.border}`,borderRadius:12,color:active?m.color:T.t3,fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
-                        >
-                          {m.id === "awful" ? "Dno" : m.label.split("/")[0]}
-                        </button>
-                      );
-                    })}
             {/* STEP 1 — How are you? Good / OK / Bad */}
             {step === 1 && (
               <>
@@ -2330,7 +2255,6 @@ export default function Index() {
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Řeč pro tebe</span>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                    {recs.speeches.map((s: Speech) => (
                     {(premium.isPremium ? recs.speeches : recs.speeches.slice(0,1)).map((s: any) => (
                       <div key={s.id} className="speech-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
@@ -2374,8 +2298,6 @@ export default function Index() {
                       <img src={monkeyMusic} alt="" style={{width:28,height:28,objectFit:"contain"}} loading="lazy"/>
                       <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Vypusť páru</span>
                     </div>
-                    <button onClick={()=>{try{const AudioContextCtor = window.AudioContext || (window as WebkitAudioWindow).webkitAudioContext; if (!AudioContextCtor) return; const c = new AudioContextCtor(); const o = c.createOscillator(); const g = c.createGain(); o.type="sawtooth"; o.frequency.value=82+Math.random()*40; g.gain.value=0.3; o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+4); g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+4);} catch (error) { console.error("Heavy metal fallback failed", error); }}} style={{width:"100%",padding:"16px",background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,color:T.red,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>
-                      🤘 HEAVY METAL — BLAST 🔊
                     <button onClick={()=>setShowSOS(true)} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
                       <img src={monkeyMusic} alt="" style={{width:40,height:40,objectFit:"contain"}} loading="lazy"/>
                       <div>
@@ -2555,7 +2477,6 @@ export default function Index() {
             onOpenChat={openChatWithPrompt}
             onCopyAsk={copyParentAsk}
           />
-          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} diaryEntries={cloud.diaryEntries} sosContacts={cloud.sosContacts} onSaveDiary={(content)=>cloud.saveDiaryEntry(content)} onSaveContacts={(contacts)=>cloud.saveSosContacts(contacts)} onCompleteQuest={completeQuest} isPremium={premium.isPremium} onUpgrade={()=>requirePremium("Plný deník & historie")} />
         )}
       </div>
 
@@ -2584,4 +2505,5 @@ export default function Index() {
     </div>
     </>
   );
+}
 }
