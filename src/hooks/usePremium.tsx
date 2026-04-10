@@ -26,46 +26,52 @@ export function usePremium(): PremiumState {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    if (!user) { setLoading(false); return; }
-    const { data } = await supabase
-      .from("subscriptions")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
-
-    if (data) {
-      setPlan((data as any).plan || "free");
-      // Check if trial has expired
-      const trialEndDate = (data as any).trial_end ? new Date((data as any).trial_end) : null;
-      if ((data as any).status === "trial" && trialEndDate && trialEndDate < new Date()) {
-        setStatus("expired");
-        // Update in DB
-        await supabase.from("subscriptions").update({ status: "expired" } as any).eq("user_id", user.id);
-      } else {
-        setStatus((data as any).status || "free");
-      }
-      setTrialEnd(trialEndDate);
-    } else {
-      // No subscription row yet (existing user) — create one
-      await supabase.from("subscriptions").insert({ user_id: user.id, plan: "free", status: "free" } as any);
+    if (!user) {
       setPlan("free");
       setStatus("free");
+      setTrialEnd(null);
+      setLoading(false);
+      return;
     }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("subscription_tier")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("Premium lookup failed, falling back to free plan", error);
+      setPlan("free");
+      setStatus("free");
+      setTrialEnd(null);
+      setLoading(false);
+      return;
+    }
+
+    const tier = (data as any)?.subscription_tier === "premium" ? "premium" : "free";
+    setPlan(tier === "premium" ? "annual" : "free");
+    setStatus(tier === "premium" ? "active" : "free");
+    setTrialEnd(null);
     setLoading(false);
   }, [user]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const startTrial = useCallback(async () => {
     if (!user) return;
-    const now = new Date();
-    const end = new Date(now.getTime() + TRIAL_DAYS * 86400000);
-    await supabase.from("subscriptions").update({
-      status: "trial",
-      plan: "annual", // trial gives annual-level access
-      trial_start: now.toISOString(),
-      trial_end: end.toISOString(),
-    } as any).eq("user_id", user.id);
+    const end = new Date(Date.now() + TRIAL_DAYS * 86400000);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ subscription_tier: "premium" } as any)
+      .eq("id", user.id);
+
+    if (error) {
+      console.warn("Could not start trial, keeping local premium state only", error);
+    }
+
     setStatus("trial");
     setPlan("annual");
     setTrialEnd(end);
@@ -76,7 +82,13 @@ export function usePremium(): PremiumState {
   const trialDaysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : 0;
 
   return {
-    plan, status, isPremium, isTrial, trialDaysLeft, loading,
-    startTrial, refreshSubscription: load,
+    plan,
+    status,
+    isPremium,
+    isTrial,
+    trialDaysLeft,
+    loading,
+    startTrial,
+    refreshSubscription: load,
   };
 }
