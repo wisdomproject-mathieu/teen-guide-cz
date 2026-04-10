@@ -17,12 +17,27 @@ interface PaywallOverlayProps {
 
 export default function PaywallOverlay({ onClose, premium, feature }: PaywallOverlayProps) {
   const [starting, setStarting] = useState(false);
+  const [startingPlan, setStartingPlan] = useState<"monthly" | "annual" | null>(null);
+
+  const handleCheckout = async (plan: "monthly" | "annual") => {
+    setStartingPlan(plan);
+    setStarting(true);
+    try {
+      await premium.startCheckout(plan);
+    } finally {
+      setStarting(false);
+      setStartingPlan(null);
+    }
+  };
 
   const handleStartTrial = async () => {
     setStarting(true);
-    await premium.startTrial();
-    setStarting(false);
-    onClose();
+    try {
+      await premium.startTrial();
+      onClose();
+    } finally {
+      setStarting(false);
+    }
   };
 
   const featureLabel = feature || "Tato funkce";
@@ -43,7 +58,7 @@ export default function PaywallOverlay({ onClose, premium, feature }: PaywallOve
           {featureLabel} je součástí Premium.
         </div>
         <div style={{ color: T.accent, fontSize: 13, fontWeight: 700, marginBottom: 24 }}>
-          Zkus 7 dní zdarma — žádná karta.
+          Vyber plán nebo zkus 7 dní zdarma.
         </div>
 
         {/* Pricing cards */}
@@ -106,26 +121,61 @@ export default function PaywallOverlay({ onClose, premium, feature }: PaywallOve
           </div>
         </div>
 
-        {/* CTA — Start trial */}
+        {/* CTA — Checkout */}
         <button
-          onClick={handleStartTrial}
+          onClick={() => handleCheckout("annual")}
           disabled={starting}
           style={{
-            width: "100%", padding: "16px 0",
+            width: "100%", padding: "15px 0",
+            background: `linear-gradient(135deg, ${T.teal}, ${T.blue})`,
+            border: "none", borderRadius: 14,
+            color: "#fff", fontSize: 16, fontWeight: 900,
+            cursor: starting ? "wait" : "pointer",
+            fontFamily: "inherit",
+            boxShadow: `0 0 24px ${T.teal}30`,
+            marginBottom: 10,
+            opacity: startingPlan && startingPlan !== "annual" ? 0.75 : 1,
+          }}
+        >
+          {starting && startingPlan === "annual" ? "Otevírám Stripe..." : "Roční Premium · 799 Kč"}
+        </button>
+
+        <button
+          onClick={() => handleCheckout("monthly")}
+          disabled={starting}
+          style={{
+            width: "100%", padding: "14px 0",
             background: `linear-gradient(135deg, ${T.accent}, #FF9A5C)`,
             border: "none", borderRadius: 14,
-            color: "#fff", fontSize: 17, fontWeight: 900,
+            color: "#fff", fontSize: 16, fontWeight: 900,
             cursor: starting ? "wait" : "pointer",
             fontFamily: "inherit",
             boxShadow: `0 0 30px ${T.accent}40`,
             marginBottom: 12,
+            opacity: startingPlan && startingPlan !== "monthly" ? 0.75 : 1,
           }}
         >
-          {starting ? "Aktivuji..." : "Zkusit 7 dní zdarma 🐵"}
+          {starting && startingPlan === "monthly" ? "Otevírám Stripe..." : "Měsíční Premium · 99 Kč"}
+        </button>
+
+        <button
+          onClick={handleStartTrial}
+          disabled={starting}
+          style={{
+            width: "100%", padding: "14px 0",
+            background: "none",
+            border: `1px solid ${T.border}`, borderRadius: 14,
+            color: T.t1, fontSize: 15, fontWeight: 800,
+            cursor: starting ? "wait" : "pointer",
+            fontFamily: "inherit",
+            marginBottom: 12,
+          }}
+        >
+          {starting && !startingPlan ? "Aktivuji trial..." : "Zkusit 7 dní zdarma"}
         </button>
 
         <div style={{ color: T.t3, fontSize: 11, lineHeight: 1.5, marginBottom: 16 }}>
-          Žádná kreditka. Žádný závazek. Odemkneš vše na 7 dní.
+          Stripe platební brána. Po dokončení se Premium odemkne automaticky.
           <br />Po skončení trial zůstaneš na Free plánu.
         </div>
 

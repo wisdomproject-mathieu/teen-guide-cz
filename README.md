@@ -47,19 +47,31 @@ Apply the SQL migration in [`supabase/migrations/20260403213703_419a6b6f-9c42-44
 - `diary_entries`
 - `user_progress`
 - `sos_contacts`
+- `subscriptions`
 
 Deploy these edge functions:
 
 - [`supabase/functions/elevenlabs-tts/index.ts`](/Users/mathieuescande/Documents/teen-guide-cz/supabase/functions/elevenlabs-tts/index.ts)
 - [`supabase/functions/elevenlabs-music/index.ts`](/Users/mathieuescande/Documents/teen-guide-cz/supabase/functions/elevenlabs-music/index.ts)
 - [`supabase/functions/monkey-chat/index.ts`](/Users/mathieuescande/Documents/teen-guide-cz/supabase/functions/monkey-chat/index.ts)
+- [`supabase/functions/create-checkout-session/index.ts`](/Users/mathieuescande/Documents/teen-guide-cz/supabase/functions/create-checkout-session/index.ts)
+- [`supabase/functions/stripe-webhook/index.ts`](/Users/mathieuescande/Documents/teen-guide-cz/supabase/functions/stripe-webhook/index.ts)
 
 Required Supabase secrets:
 
 - `ELEVENLABS_API_KEY`
 - `LOVABLE_API_KEY`
 
+Payment gateway secrets:
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PRICE_MONTHLY`
+- `STRIPE_PRICE_ANNUAL`
+- `SITE_URL`
+
 ## Notes
 
 - Speech playback prefers ElevenLabs and falls back to the browser TTS engine when the function is unavailable.
 - SOS music generation falls back to Web Audio if the music function fails.
+- Stripe Checkout drives `subscriptions` and the webhook mirrors entitlement back to `profiles.subscription_tier`.
