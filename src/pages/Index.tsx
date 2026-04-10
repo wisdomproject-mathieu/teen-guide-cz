@@ -1915,8 +1915,6 @@ export default function Index() {
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
   const selectMood = (m: MoodOption) => { setSelectedMood(m); setStep(1); };
-  const selectReason = (r: ReasonOption) => {
-    if (!selectedMood) return;
   const handleSliderChange = (idx: number) => { setSliderIndex(idx); setSelectedMood(MOODS[idx]); setIntensity(3); };
   const selectMood = (m: any) => { setSelectedMood(m); setIntensity(3); };
   const confirmMood = () => { if (selectedMood) setStep(2); };
