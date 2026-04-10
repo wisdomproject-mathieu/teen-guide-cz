@@ -1963,13 +1963,25 @@ export default function Index() {
   };
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
-  const selectMood = (m: MoodOption) => { setSelectedMood(m); setStep(1); };
+  const selectMood = (m: MoodOption) => {
+    setSelectedMood(m);
+    setSelectedReason(null);
+    setRecs(null);
+    setStep(1);
+    setIntensity(3);
+  };
+  const handleSliderChange = (idx: number) => {
+    setSliderIndex(idx);
+    setSelectedMood(MOODS[idx]);
+    setSelectedReason(null);
+    setRecs(null);
+    setIntensity(3);
+  };
+  const confirmMood = () => {
+    if (selectedMood) setStep(2);
+  };
   const selectReason = (r: ReasonOption) => {
     if (!selectedMood) return;
-  const handleSliderChange = (idx: number) => { setSliderIndex(idx); setSelectedMood(MOODS[idx]); setIntensity(3); };
-  const selectMood = (m: any) => { setSelectedMood(m); setIntensity(3); };
-  const confirmMood = () => { if (selectedMood) setStep(2); };
-  const selectReason = (r: any) => {
     setSelectedReason(r);
     cloud.logMood(selectedMood.id, r.id);
     const today = new Date().toISOString().split("T")[0];
@@ -2490,5 +2502,4 @@ export default function Index() {
     </div>
     </>
   );
-}
 }
