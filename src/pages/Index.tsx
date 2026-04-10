@@ -183,8 +183,6 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
         setUsingFallback(false);
       } catch (err) {
         console.error("Speech playback failed", err);
-        setCachedAudio(cacheKey, audioUrl);
-      } catch {
         setLoading(false);
         setUsingFallback(true);
         const message = err instanceof Error ? err.message : "Prémiový hlas se teď nenačetl. Zkus to prosím znovu.";
@@ -2051,7 +2049,6 @@ export default function Index() {
         input::placeholder,textarea::placeholder{color:${T.t3}}
       `}</style>
       <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatar} style={{display:"none"}}/>
-      {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)} isPremium={isPremium} onUpgrade={openUpgrade} />}
       {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)}/>}
       {showPaywall && <PaywallOverlay onClose={()=>setShowPaywall(false)} premium={premium} feature={paywallFeature} />}
       {xpPopup && <XpPopup xp={xpPopup.xp} label={xpPopup.label} onDone={() => setXpPopup(null)} />}
@@ -2283,7 +2280,6 @@ export default function Index() {
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Řeč pro tebe</span>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                    {recs.speeches.map((s: Speech) => (
                     {(premium.isPremium ? recs.speeches : recs.speeches.slice(0,1)).map((s: any) => (
                       <div key={s.id} className="speech-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
@@ -2327,8 +2323,6 @@ export default function Index() {
                       <img src={monkeyMusic} alt="" style={{width:28,height:28,objectFit:"contain"}} loading="lazy"/>
                       <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Vypusť páru</span>
                     </div>
-                    <button onClick={()=>{try{const AudioContextCtor = window.AudioContext || (window as WebkitAudioWindow).webkitAudioContext; if (!AudioContextCtor) return; const c = new AudioContextCtor(); const o = c.createOscillator(); const g = c.createGain(); o.type="sawtooth"; o.frequency.value=82+Math.random()*40; g.gain.value=0.3; o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+4); g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+4);} catch (error) { console.error("Heavy metal fallback failed", error); }}} style={{width:"100%",padding:"16px",background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,color:T.red,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>
-                      🤘 HEAVY METAL — BLAST 🔊
                     <button onClick={()=>setShowSOS(true)} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
                       <img src={monkeyMusic} alt="" style={{width:40,height:40,objectFit:"contain"}} loading="lazy"/>
                       <div>
@@ -2477,7 +2471,6 @@ export default function Index() {
         )}
 
         {/* ════════ CHAT TAB ════════ */}
-        {tab === "chat" && <MonkeyChat isPremium={isPremium} onUpgrade={openUpgrade} initialPrompt={chatSeed} />}
         {tab === "chat" && (premium.isPremium ? <MonkeyChat /> : (
           <div className="anim-fadeUp" style={{textAlign:"center",padding:"40px 16px"}}>
             <img src={monkeyChat} alt="" className="anim-float" style={{width:80,height:80,objectFit:"contain",margin:"0 auto 16px"}} />
@@ -2494,20 +2487,6 @@ export default function Index() {
 
         {/* ════════ PROFILE TAB ════════ */}
         {tab === "profile" && (
-          <ProfileTab
-            moodLog={moodLog}
-            streakCount={streakCount}
-            userName={userName}
-            avatar={avatar}
-            subscriptionTier={subscriptionTier}
-            initialSection={profileSection}
-            onNameChange={handleNameChange}
-            onAvatarClick={()=>fileRef.current?.click()}
-            onSignOut={signOut}
-            onUpgrade={openUpgrade}
-            onOpenChat={openChatWithPrompt}
-            onCopyAsk={copyParentAsk}
-          />
           <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} diaryEntries={cloud.diaryEntries} sosContacts={cloud.sosContacts} onSaveDiary={(content)=>cloud.saveDiaryEntry(content)} onSaveContacts={(contacts)=>cloud.saveSosContacts(contacts)} onCompleteQuest={completeQuest} isPremium={premium.isPremium} onUpgrade={()=>requirePremium("Plný deník & historie")} />
         )}
       </div>
