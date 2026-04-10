@@ -52,7 +52,7 @@ export function useCloudData() {
         setProfile(profileRes.data);
         setUserName(profileRes.data.display_name || "");
         setEquippedSkin(profileRes.data.equipped_skin || "default");
-        setSubscriptionTier(profileRes.data.subscription_tier === "premium" ? "premium" : "free");
+        // subscription_tier is managed by usePremium hook
       }
 
       if (moodsRes.data) {
@@ -160,7 +160,6 @@ export function useCloudData() {
 
   return {
     loading, moodLog, xp, streakCount, completedQuests,
-    equippedSkin, subscriptionTier, userName, profile, lastCheckinDate,
     equippedSkin, userName, profile, lastCheckinDate,
     diaryEntries, sosContacts,
     updateName, updateSkin, logMood, updateProgress,

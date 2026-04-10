@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useCloudData } from "@/hooks/useCloudData";
@@ -148,8 +147,6 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
   };
 
   const play = async () => {
-    if (playing) { stopPlayback(); return; }
-    let audioUrl = audioCache.get(speechId);
     if (playing) { audioRef.current?.pause(); setPlaying(false); return; }
     const cacheKey = `${speechId}-i${intensity||3}`;
     let audioUrl = audioCache.get(cacheKey);
@@ -161,15 +158,6 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
           method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
           body: JSON.stringify({ text, emotion, intensity: intensity || 3 }),
         });
-        if (!response.ok) {
-          const detail = await extractResponseError(response);
-          throw new Error(detail || "TTS failed");
-        }
-        const contentType = response.headers.get("content-type") || "";
-        if (!contentType.includes("audio")) {
-          const detail = await extractResponseError(response.clone());
-          throw new Error(detail || `Unexpected content type: ${contentType}`);
-        }
         const contentType = response.headers.get("Content-Type") || "";
         if (contentType.includes("application/json")) {
           const data = await response.json();
@@ -179,7 +167,7 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
         const audioBlob = await response.blob();
         if (audioBlob.size < 1000) throw new Error("Empty audio");
         audioUrl = URL.createObjectURL(audioBlob);
-        audioCache.set(speechId, audioUrl);
+        audioCache.set(cacheKey, audioUrl);
         setUsingFallback(false);
       } catch (err) {
         console.error("Speech playback failed", err);
@@ -677,8 +665,6 @@ function ContentLibrary({
   const [activeShortId, setActiveShortId] = useState<string | null>(null);
   const toggleShort = (item: ContentItem) => {
     setActiveShortId((current) => current === item.id ? null : item.id);
-    audio.onended = () => { setPlaying(false); onComplete?.(); }; audio.onerror = () => setPlaying(false);
-    setPlaying(true); audio.play();
   };
 
   return (
@@ -1268,7 +1254,7 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
       </div>
 
       {activeSection==="premium" && (
-        <UpgradeScreen onCopyAsk={onCopyAsk} />
+        <UpgradeScreen onCopyAsk={() => {}} />
       )}
 
       {activeSection==="overview" && (
@@ -1350,7 +1336,7 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
           <div style={{color:T.t2,fontSize:12,marginBottom:14,lineHeight:1.6}}>
             Vyber si rychlý speech, silný short nebo motivační video. Nejlepší kousky jsou připravené zdarma, hlubší obsah odemyká Premium.
           </div>
-          <ContentLibrary isPremium={isPremium} onUpgrade={onUpgrade} onOpenChat={onOpenChat} />
+          <ContentLibrary isPremium={isPremium} onUpgrade={onUpgrade} onOpenChat={() => {}} />
         </div>
       )}
 
@@ -1542,7 +1528,6 @@ function SOSOverlay({onClose, isPremium, onUpgrade}: {onClose:()=>void; isPremiu
       happy: { freqs: [262, 330, 392, 523], type: "sine", lfoRate: 0.2, filterFreq: 2000 },
       lofi:  { freqs: [196, 247, 294], type: "triangle", lfoRate: 0.12, filterFreq: 950 },
       rage:  { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
-      metal: { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
       lofi:  { freqs: [196, 247, 294, 370], type: "triangle", lfoRate: 0.05, filterFreq: 500 },
       rage:  { freqs: [82, 123, 165], type: "sawtooth", lfoRate: 0.5, filterFreq: 1800 },
     };
@@ -1783,9 +1768,8 @@ function SOSOverlay({onClose, isPremium, onUpgrade}: {onClose:()=>void; isPremiu
 export default function Index() {
   const { signOut } = useAuth();
   const cloud = useCloudData();
-  const { moodLog, xp, streakCount, completedQuests, equippedSkin, subscriptionTier, userName, lastCheckinDate, loading: cloudLoading } = cloud;
-  const premium = usePremium();
   const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName, lastCheckinDate, loading: cloudLoading } = cloud;
+  const premium = usePremium();
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [tab, setTab] = useState("feel");
@@ -1797,13 +1781,7 @@ export default function Index() {
   const [xpPopup, setXpPopup] = useState<{xp:number;label:string}|null>(null);
   const [levelUp, setLevelUp] = useState<{level:number;skin?:typeof MONKEY_SKINS[0]|null}|null>(null);
   const [step, setStep] = useState(1);
-  const [selectedMood, setSelectedMood] = useState<MoodOption | null>(null);
-  const [selectedReason, setSelectedReason] = useState<ReasonOption | null>(null);
-  const [recs, setRecs] = useState<RecommendationBundle | null>(null);
-  const isPremium = subscriptionTier === "premium";
-  const [profileSection, setProfileSection] = useState<"overview"|"premium"|"library"|"insights"|"contacts"|"diary"|"calendar">("overview");
-  const [chatSeed, setChatSeed] = useState<string | null>(null);
-  const [sliderIndex, setSliderIndex] = useState(3); // middle = meh
+  const [sliderIndex, setSliderIndex] = useState(3);
   const [selectedMood, setSelectedMood] = useState<any>(null);
   const [selectedReason, setSelectedReason] = useState<any>(null);
   const [intensity, setIntensity] = useState(3);
@@ -1914,7 +1892,6 @@ export default function Index() {
   };
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
-  const selectMood = (m: MoodOption) => { setSelectedMood(m); setStep(1); };
   const handleSliderChange = (idx: number) => { setSliderIndex(idx); setSelectedMood(MOODS[idx]); setIntensity(3); };
   const selectMood = (m: any) => { setSelectedMood(m); setIntensity(3); };
   const confirmMood = () => { if (selectedMood) setStep(2); };
@@ -2009,7 +1986,7 @@ export default function Index() {
         input::placeholder,textarea::placeholder{color:${T.t3}}
       `}</style>
       <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatar} style={{display:"none"}}/>
-      {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)}/>}
+      {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)} isPremium={premium.isPremium} onUpgrade={()=>requirePremium("SOS")}/>}
       {showPaywall && <PaywallOverlay onClose={()=>setShowPaywall(false)} premium={premium} feature={paywallFeature} />}
       {xpPopup && <XpPopup xp={xpPopup.xp} label={xpPopup.label} onDone={() => setXpPopup(null)} />}
       {levelUp && <LevelUpOverlay level={levelUp.level} skin={levelUp.skin} onDone={() => setLevelUp(null)} />}
@@ -2372,7 +2349,7 @@ export default function Index() {
         )}
 
         {/* ════════ CHAT TAB ════════ */}
-        {tab === "chat" && (premium.isPremium ? <MonkeyChat /> : (
+        {tab === "chat" && (premium.isPremium ? <MonkeyChat isPremium={premium.isPremium} onUpgrade={()=>requirePremium("Opičák AI chat")} initialPrompt="" /> : (
           <div className="anim-fadeUp" style={{textAlign:"center",padding:"40px 16px"}}>
             <img src={monkeyChat} alt="" className="anim-float" style={{width:80,height:80,objectFit:"contain",margin:"0 auto 16px"}} />
             <div style={{color:T.t1,fontSize:20,fontWeight:900,marginBottom:8}}>Opičák je Premium 👑</div>
