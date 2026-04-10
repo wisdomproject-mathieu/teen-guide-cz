@@ -34,7 +34,21 @@ export function useCloudData() {
 
   // Load all data on mount
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setProfile(null);
+      setMoodLog([]);
+      setXp(0);
+      setStreakCount(0);
+      setCompletedQuests([]);
+      setEquippedSkin("default");
+      setSubscriptionTier("free");
+      setUserName("");
+      setLastCheckinDate(null);
+      setDiaryEntries([]);
+      setSosContacts([]);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
 
     const load = async () => {
