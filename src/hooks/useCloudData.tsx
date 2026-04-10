@@ -6,6 +6,8 @@ import { useAuth } from "./useAuth";
 type ProfileRow = Tables<"profiles">;
 type MoodLogRow = Tables<"mood_logs">;
 type UserProgressRow = Tables<"user_progress">;
+type DiaryEntryRow = Tables<"diary_entries">;
+type SosContactRow = Tables<"sos_contacts">;
 type MoodLogEntry = {
   mood: { id: string };
   reason: { id: string } | null;
@@ -29,8 +31,8 @@ export function useCloudData() {
   const [userName, setUserName] = useState("");
   const [lastCheckinDate, setLastCheckinDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [diaryEntries, setDiaryEntries] = useState<any[]>([]);
-  const [sosContacts, setSosContacts] = useState<{id?:string; name:string; phone:string}[]>([]);
+  const [diaryEntries, setDiaryEntries] = useState<DiaryEntryRow[]>([]);
+  const [sosContacts, setSosContacts] = useState<SosContactRow[]>([]);
 
   // Load all data on mount
   useEffect(() => {
@@ -86,11 +88,11 @@ export function useCloudData() {
       }
 
       if (diaryRes.data) {
-        setDiaryEntries(diaryRes.data);
+        setDiaryEntries(diaryRes.data as DiaryEntryRow[]);
       }
 
       if (contactsRes.data) {
-        setSosContacts(contactsRes.data.map((c: any) => ({ id: c.id, name: c.name, phone: c.phone })));
+        setSosContacts(contactsRes.data as SosContactRow[]);
       }
 
       setLoading(false);
@@ -158,14 +160,14 @@ export function useCloudData() {
   const saveSosContacts = useCallback(async (contacts: {id?:string; name:string; phone:string}[]) => {
     if (!user) return;
     // Delete all existing contacts and re-insert
-    await supabase.from("sos_contacts").delete().eq("user_id", user.id);
-    const validContacts = contacts.filter(c => c.name.trim() || c.phone.trim());
+      await supabase.from("sos_contacts").delete().eq("user_id", user.id);
+      const validContacts = contacts.filter(c => c.name.trim() || c.phone.trim());
     if (validContacts.length > 0) {
       const { data } = await supabase.from("sos_contacts").insert(
         validContacts.map(c => ({ user_id: user.id, name: c.name, phone: c.phone }))
       ).select();
       if (data) {
-        setSosContacts(data.map((c: any) => ({ id: c.id, name: c.name, phone: c.phone })));
+        setSosContacts(data as SosContactRow[]);
       }
     } else {
       setSosContacts([]);

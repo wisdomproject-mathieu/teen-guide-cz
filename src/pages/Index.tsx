@@ -11,6 +11,7 @@ import { getRecommendations } from "@/data/speeches";
 import type { Speech } from "@/data/speeches";
 import { CONTENT_BLUEPRINT, FREE_TASTE_LAYER_IDS, PREMIUM_HERO_IDS } from "@/data/contentBlueprint";
 import type { ContentItem } from "@/data/contentBlueprint";
+import type { Tables } from "@/integrations/supabase/types";
 import monkeyHero from "@/assets/monkey-hero.png";
 import monkeySad from "@/assets/monkey-sad.png";
 import monkeyAngry from "@/assets/monkey-angry.png";
@@ -99,10 +100,61 @@ function setCachedAudio(key: string, url: string) {
   audioCache.set(key, url);
 }
 
+function getCzechSpeechVoice() {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  return voices.find((voice) => voice.lang?.toLowerCase().startsWith("cs"))
+    || voices.find((voice) => /czech/i.test(voice.name))
+    || voices[0]
+    || null;
+}
+
+function speakBrowserText(text: string, handlers?: {
+  rate?: number;
+  pitch?: number;
+  onStart?: () => void;
+  onEnd?: () => void;
+  onError?: () => void;
+}) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+    throw new Error("speechSynthesis is not available");
+  }
+
+  const synth = window.speechSynthesis;
+  synth.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "cs-CZ";
+  utterance.rate = handlers?.rate ?? 1.03;
+  utterance.pitch = handlers?.pitch ?? 0.98;
+  utterance.volume = 1;
+
+  const voice = getCzechSpeechVoice();
+  if (voice) utterance.voice = voice;
+
+  utterance.onstart = () => handlers?.onStart?.();
+  utterance.onend = () => handlers?.onEnd?.();
+  utterance.onerror = () => handlers?.onError?.();
+
+  synth.speak(utterance);
+  return utterance;
+}
+
+function mapTtsFallbackMessage(detail?: string | null) {
+  const normalized = (detail || "").toLowerCase();
+  if (normalized.includes("invalid api key") || normalized.includes("service_unavailable") || normalized.includes("unexpected content type")) {
+    return "Prémiový hlas je teď dočasně nedostupný. Pouštím náhradní hlas.";
+  }
+  return "Prémiový hlas je teď dočasně nedostupný. Pouštím náhradní hlas.";
+}
+
 type MoodOption = typeof MOODS[number];
 type ReasonOption = typeof REASONS[number];
 type RecommendationBundle = ReturnType<typeof getRecommendations>;
 type SubscriptionTier = "free" | "premium";
+type DiaryEntryRow = Tables<"diary_entries">;
+type ProfileRow = Tables<"profiles">;
+type SosContactRow = Tables<"sos_contacts">;
 type MoodLogEntry = {
   mood: { id: string };
   reason: { id: string } | null;
@@ -122,13 +174,20 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
   const [usingFallback, setUsingFallback] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const browserSpeechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const stopPlayback = () => {
     audioRef.current?.pause();
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
     }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    browserSpeechRef.current = null;
     setPlaying(false);
+    setLoading(false);
+    setUsingFallback(false);
   };
 
   const extractResponseError = async (response: Response) => {
@@ -160,7 +219,30 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
         const contentType = response.headers.get("content-type") || "";
         if (!contentType.includes("audio")) {
           const detail = await response.text();
-          throw new Error(detail || `Unexpected content type: ${contentType}`);
+          const friendly = mapTtsFallbackMessage(detail);
+          console.warn("SpeechPlayer received non-audio response", detail);
+          setLoading(false);
+          setUsingFallback(true);
+          setError(friendly);
+          setPlaying(true);
+          browserSpeechRef.current = speakBrowserText(text, {
+            rate: 1.03 + Math.min((intensity || 3) - 3, 2) * 0.02,
+            pitch: 0.98,
+            onEnd: () => {
+              setPlaying(false);
+              setUsingFallback(false);
+              browserSpeechRef.current = null;
+              onComplete?.();
+            },
+            onError: () => {
+              setPlaying(false);
+              setUsingFallback(false);
+              setError("Náhradní hlas se nepodařilo spustit. Zkus to prosím znovu.");
+              browserSpeechRef.current = null;
+            },
+          });
+          onComplete?.();
+          return;
         }
         const audioBlob = await response.blob();
         if (audioBlob.size < 1000) throw new Error("Empty audio");
@@ -169,10 +251,35 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
         setUsingFallback(false);
       } catch (err) {
         console.error("Speech playback failed", err);
+        const detail = err instanceof Error ? err.message : null;
+        const message = mapTtsFallbackMessage(detail);
         setLoading(false);
         setUsingFallback(true);
-        const message = err instanceof Error ? err.message : "Prémiový hlas se teď nenačetl. Zkus to prosím znovu.";
         setError(message);
+        setPlaying(true);
+        try {
+          browserSpeechRef.current = speakBrowserText(text, {
+            rate: 1.03 + Math.min((intensity || 3) - 3, 2) * 0.02,
+            pitch: 0.98,
+            onEnd: () => {
+              setPlaying(false);
+              setUsingFallback(false);
+              browserSpeechRef.current = null;
+              onComplete?.();
+            },
+            onError: () => {
+              setPlaying(false);
+              setUsingFallback(false);
+              setError("Náhradní hlas se nepodařilo spustit. Zkus to prosím znovu.");
+              browserSpeechRef.current = null;
+            },
+          });
+        } catch (fallbackErr) {
+          console.error("Browser speech fallback failed", fallbackErr);
+          setPlaying(false);
+          setUsingFallback(false);
+          setError("Náhradní hlas v tomhle prohlížeči nejde spustit.");
+        }
         return;
       }
       setLoading(false);
@@ -196,7 +303,7 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
       <button onClick={play} disabled={loading} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:12,cursor:loading?"wait":"pointer",fontFamily:"inherit",width:"100%"}}>
         <span style={{fontSize:18,color:T.accent}}>{loading?"⏳":playing?"■":"▶"}</span>
-        <span style={{color:T.t1,fontSize:13,fontWeight:600}}>{loading?"Generuji hlas...":usingFallback?"Hlas potřebuje zkusit znovu":label}</span>
+        <span style={{color:T.t1,fontSize:13,fontWeight:600}}>{loading?"Generuji hlas...":usingFallback?"Prémiový hlas je teď dočasně nedostupný. Pouštím náhradní hlas.":label}</span>
         {playing && <span style={{color:T.accent,fontSize:11,marginLeft:"auto"}}>🔊 Hraje</span>}
       </button>
       {error && <div style={{color:T.red,fontSize:12,fontWeight:700}}>{error}</div>}
@@ -360,6 +467,7 @@ function MonkeyShortPlayer({
   const [voicePlaying, setVoicePlaying] = useState(false);
   const shortVisual = getShortVisual(item);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const browserSpeechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const timersRef = useRef<number[]>([]);
   const [captionPulseKey, setCaptionPulseKey] = useState(0);
 
@@ -411,6 +519,10 @@ function MonkeyShortPlayer({
         audioRef.current.pause();
         audioRef.current = null;
       }
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      browserSpeechRef.current = null;
     };
   }, [clearCaptionTimers]);
 
@@ -430,6 +542,10 @@ function MonkeyShortPlayer({
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       audioRef.current = null;
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      browserSpeechRef.current = null;
       setVoicePlaying(false);
       setVoiceLoading(false);
       clearCaptionTimers();
@@ -449,7 +565,10 @@ function MonkeyShortPlayer({
           headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
           body: JSON.stringify({ text: fullText, emotion: item.emotion || "all" }),
         });
-        if (!response.ok) throw new Error("TTS failed");
+        if (!response.ok) {
+          const detail = await response.text().catch(() => "");
+          throw new Error(detail || "TTS failed");
+        }
         const audioBlob = await response.blob();
         if (audioBlob.size < 1000) throw new Error("Empty audio");
         audioUrl = URL.createObjectURL(audioBlob);
@@ -478,9 +597,36 @@ function MonkeyShortPlayer({
       setVoiceLoading(false);
     } catch (error) {
       console.error("Monkey short voice failed", error);
+      const friendly = mapTtsFallbackMessage(error instanceof Error ? error.message : null);
       setVoiceLoading(false);
       setVoicePlaying(false);
-      setVoiceError("Prémiový hlas se nepodařilo načíst. Zkus to prosím znovu.");
+      setVoiceError(friendly);
+      try {
+        setPlaying(true);
+        setVoicePlaying(true);
+        browserSpeechRef.current = speakBrowserText(fullText, {
+          rate: 1.02,
+          pitch: 0.98,
+          onEnd: () => {
+            setVoicePlaying(false);
+            setVoiceLoading(false);
+            setPlaying(false);
+            browserSpeechRef.current = null;
+          },
+          onError: () => {
+            setVoicePlaying(false);
+            setVoiceLoading(false);
+            setPlaying(false);
+            setVoiceError("Náhradní hlas se nepodařilo spustit. Zkus to prosím znovu.");
+            browserSpeechRef.current = null;
+          },
+        });
+        runCaptionSequence(item.durationSeconds * 1000);
+      } catch (fallbackErr) {
+        console.error("Browser speech fallback failed for short", fallbackErr);
+        setPlaying(false);
+        setVoiceError("Náhradní hlas v tomhle prohlížeči nejde spustit.");
+      }
     }
   };
 
@@ -1252,8 +1398,8 @@ function ProfileTab({
   onNameChange: (n: string) => void;
   onAvatarClick: () => void;
   onSignOut: () => void;
-  diaryEntries?: any[];
-  sosContacts?: { id?: string; name: string; phone: string }[];
+  diaryEntries?: DiaryEntryRow[];
+  sosContacts?: SosContactRow[];
   onSaveDiary?: (content: string) => void;
   onSaveContacts?: (contacts: { id?: string; name: string; phone: string }[]) => void;
   onCompleteQuest?: (id: string) => void;
@@ -1262,7 +1408,9 @@ function ProfileTab({
   onCopyAsk: () => void;
 }) {
   const [activeSection, setActiveSection] = useState("overview");
-  const [contacts, setContacts] = useState<{id?:string;name:string;phone:string}[]>(sosContacts.length > 0 ? sosContacts : [{name:"",phone:""}]);
+  const [contacts, setContacts] = useState<{id?:string;name:string;phone:string}[]>(
+    sosContacts.length > 0 ? sosContacts.map((c) => ({ id: c.id, name: c.name, phone: c.phone })) : [{name:"",phone:""}]
+  );
   const [diary, setDiary] = useState("");
   const [diarySaved, setDiarySaved] = useState(false);
   const days = ["Po","Út","St","Čt","Pá","So","Ne"];
@@ -1453,11 +1601,11 @@ function ProfileTab({
               {(() => {
                 // Free users: only entries from last 7 days
                 const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
-                const visibleEntries = isPremium ? diaryEntries : diaryEntries.filter((e: any) => new Date(e.created_at) >= sevenDaysAgo);
+                const visibleEntries = isPremium ? diaryEntries : diaryEntries.filter((e) => new Date(e.created_at) >= sevenDaysAgo);
                 const hiddenCount = diaryEntries.length - visibleEntries.length;
                 return (
                   <>
-                    {visibleEntries.slice(0,10).map((e:any,i:number) => (
+                    {visibleEntries.slice(0,10).map((e, i) => (
                       <div key={e.id||i} style={{padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,marginBottom:8}}>
                         <div style={{color:T.t2,fontSize:11,marginBottom:4}}>{new Date(e.created_at).toLocaleString("cs-CZ")}</div>
                         <div style={{color:T.t1,fontSize:13,lineHeight:1.5}}>{e.content}</div>
@@ -1898,7 +2046,7 @@ export default function Index() {
     if (newName) cloud.updateName(newName);
     const uid = cloud.profile?.id;
     if (uid) {
-      await supabase.from("profiles").update({ onboarded: true } as any).eq("id", uid);
+      await supabase.from("profiles").update({ onboarded: true } satisfies Partial<ProfileRow>).eq("id", uid);
     }
     const moodIdx = MOODS.findIndex(m => m.id === moodId);
     if (moodIdx >= 0) {
@@ -2005,7 +2153,7 @@ export default function Index() {
   };
   const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); setIntensity(3); setShareCard(null); setSliderIndex(3); };
 
-  const handleSpeechComplete = (speech: any) => {
+  const handleSpeechComplete = (speech: Speech) => {
     completeQuest("speech");
     const rank = getWarriorRank(xp);
     setShareCard({ quote: speech.title, rank: rank.name, mood: selectedMood?.label || "" });
@@ -2252,7 +2400,7 @@ export default function Index() {
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Řeč pro tebe</span>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                    {(premium.isPremium ? recs.speeches : recs.speeches.slice(0,1)).map((s: any) => (
+                    {(premium.isPremium ? recs.speeches : recs.speeches.slice(0,1)).map((s: Speech) => (
                       <div key={s.id} className="speech-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                           <span style={{fontSize:22}}>{s.icon}</span>
@@ -2444,16 +2592,6 @@ export default function Index() {
 
         {/* ════════ CHAT TAB ════════ */}
         {tab === "chat" && <MonkeyChat isPremium={isPremium} onUpgrade={openUpgrade} initialPrompt={chatSeed} />}
-        {tab === "chat" && (premium.isPremium ? <MonkeyChat /> : (
-          <div className="anim-fadeUp" style={{textAlign:"center",padding:"40px 16px"}}>
-            <img src={monkeyChat} alt="" className="anim-float" style={{width:80,height:80,objectFit:"contain",margin:"0 auto 16px"}} />
-            <div style={{color:T.t1,fontSize:20,fontWeight:900,marginBottom:8}}>Opičák je Premium 👑</div>
-            <div style={{color:T.t2,fontSize:14,lineHeight:1.6,marginBottom:20}}>AI chat má provozní náklady — je součástí Premium plánu. Zkus 7 dní zdarma!</div>
-            <button onClick={()=>requirePremium("Opičák AI chat")} style={{padding:"14px 32px",background:`linear-gradient(135deg, ${T.accent}, #FF9A5C)`,border:"none",borderRadius:14,color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 0 20px ${T.accent}40`}}>
-              Odemknout Opičáka 🐵
-            </button>
-          </div>
-        ))}
 
         {/* ════════ QUESTS TAB ════════ */}
         {tab === "quests" && <QuestsTab xp={xp} completedQuests={completedQuests} onEquipSkin={equipSkin} equippedSkin={equippedSkin} />}

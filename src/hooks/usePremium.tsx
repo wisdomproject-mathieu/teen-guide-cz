@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 import { useAuth } from "./useAuth";
 
 export type PlanType = "free" | "monthly" | "annual";
@@ -19,6 +20,7 @@ export interface PremiumState {
 const TRIAL_DAYS = 7;
 
 export function usePremium(): PremiumState {
+  type ProfileRow = Tables<"profiles">;
   const { user } = useAuth();
   const [plan, setPlan] = useState<PlanType>("free");
   const [status, setStatus] = useState<SubStatus>("free");
@@ -49,7 +51,7 @@ export function usePremium(): PremiumState {
       return;
     }
 
-    const tier = (data as any)?.subscription_tier === "premium" ? "premium" : "free";
+    const tier = data?.subscription_tier === "premium" ? "premium" : "free";
     setPlan(tier === "premium" ? "annual" : "free");
     setStatus(tier === "premium" ? "active" : "free");
     setTrialEnd(null);
@@ -65,7 +67,7 @@ export function usePremium(): PremiumState {
     const end = new Date(Date.now() + TRIAL_DAYS * 86400000);
     const { error } = await supabase
       .from("profiles")
-      .update({ subscription_tier: "premium" } as any)
+      .update({ subscription_tier: "premium" } satisfies Partial<ProfileRow>)
       .eq("id", user.id);
 
     if (error) {
