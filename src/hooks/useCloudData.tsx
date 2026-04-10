@@ -1,15 +1,31 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json, Tables } from "@/integrations/supabase/types";
 import { useAuth } from "./useAuth";
+
+type ProfileRow = Tables<"profiles">;
+type MoodLogRow = Tables<"mood_logs">;
+type UserProgressRow = Tables<"user_progress">;
+type MoodLogEntry = {
+  mood: { id: string };
+  reason: { id: string } | null;
+  ts: string;
+  id: string;
+};
+
+function toCompletedQuestList(value: Json): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
 
 export function useCloudData() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<any>(null);
-  const [moodLog, setMoodLog] = useState<any[]>([]);
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [moodLog, setMoodLog] = useState<MoodLogEntry[]>([]);
   const [xp, setXp] = useState(0);
   const [streakCount, setStreakCount] = useState(0);
   const [completedQuests, setCompletedQuests] = useState<string[]>([]);
   const [equippedSkin, setEquippedSkin] = useState("default");
+  const [subscriptionTier, setSubscriptionTier] = useState<"free" | "premium">("free");
   const [userName, setUserName] = useState("");
   const [lastCheckinDate, setLastCheckinDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,10 +52,11 @@ export function useCloudData() {
         setProfile(profileRes.data);
         setUserName(profileRes.data.display_name || "");
         setEquippedSkin(profileRes.data.equipped_skin || "default");
+        setSubscriptionTier(profileRes.data.subscription_tier === "premium" ? "premium" : "free");
       }
 
       if (moodsRes.data) {
-        setMoodLog(moodsRes.data.map((m: any) => ({
+        setMoodLog(moodsRes.data.map((m: MoodLogRow) => ({
           mood: { id: m.mood_id },
           reason: m.reason_id ? { id: m.reason_id } : null,
           ts: new Date(m.created_at).toLocaleString("cs-CZ"),
@@ -50,7 +67,7 @@ export function useCloudData() {
       if (progressRes.data) {
         setXp(progressRes.data.xp || 0);
         setStreakCount(progressRes.data.streak_count || 0);
-        setCompletedQuests((progressRes.data.completed_quests as string[]) || []);
+        setCompletedQuests(toCompletedQuestList(progressRes.data.completed_quests));
         setLastCheckinDate(progressRes.data.last_checkin_date || null);
       }
 
@@ -105,9 +122,9 @@ export function useCloudData() {
       await supabase.from("user_progress").update({
         xp: newXp,
         streak_count: newStreak,
-        completed_quests: newQuests as any,
+        completed_quests: newQuests,
         last_checkin_date: new Date().toISOString().split("T")[0],
-      }).eq("id", user.id);
+      } satisfies Partial<UserProgressRow>).eq("id", user.id);
     }
   }, [user]);
 
@@ -143,6 +160,7 @@ export function useCloudData() {
 
   return {
     loading, moodLog, xp, streakCount, completedQuests,
+    equippedSkin, subscriptionTier, userName, profile, lastCheckinDate,
     equippedSkin, userName, profile, lastCheckinDate,
     diaryEntries, sosContacts,
     updateName, updateSkin, logMood, updateProgress,

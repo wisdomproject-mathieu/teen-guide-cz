@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -8,6 +9,9 @@ import InAppNotifications from "@/components/InAppNotifications";
 import PaywallOverlay from "@/components/PaywallOverlay";
 import { useAuth } from "@/hooks/useAuth";
 import { getRecommendations } from "@/data/speeches";
+import type { Speech } from "@/data/speeches";
+import { CONTENT_BLUEPRINT, FREE_TASTE_LAYER_IDS, PREMIUM_HERO_IDS } from "@/data/contentBlueprint";
+import type { ContentItem } from "@/data/contentBlueprint";
 import monkeyHero from "@/assets/monkey-hero.png";
 import monkeySad from "@/assets/monkey-sad.png";
 import monkeyAngry from "@/assets/monkey-angry.png";
@@ -96,22 +100,76 @@ function setCachedAudio(key: string, url: string) {
   audioCache.set(key, url);
 }
 
+type MoodOption = typeof MOODS[number];
+type ReasonOption = typeof REASONS[number];
+type RecommendationBundle = ReturnType<typeof getRecommendations>;
+type SubscriptionTier = "free" | "premium";
+type MoodLogEntry = {
+  mood: { id: string };
+  reason: { id: string } | null;
+  ts: string;
+  id: string;
+};
+type BreathingPhase = { label: string; dur: number; color: string };
+type BreathingPattern = { name: string; phases: BreathingPhase[] };
+type CalendarDay = MoodLogEntry | null;
+type AudioNodeWithStop = AudioNode & { stop?: () => void };
+type WebkitAudioWindow = Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext };
+
 // ── SPEECH PLAYER ──
 function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {text: string; label: string; speechId: string; emotion: string; intensity?: number; onComplete?:()=>void}) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  const stopPlayback = () => {
+    audioRef.current?.pause();
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
+    if (synthRef.current) {
+      window.speechSynthesis.cancel();
+      synthRef.current = null;
+    }
+    setPlaying(false);
+  };
+
+  const extractResponseError = async (response: Response) => {
+    const raw = await response.text();
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed.details || parsed.error || raw;
+    } catch {
+      return raw;
+    }
+  };
+
   const play = async () => {
+    if (playing) { stopPlayback(); return; }
+    let audioUrl = audioCache.get(speechId);
     if (playing) { audioRef.current?.pause(); setPlaying(false); return; }
     const cacheKey = `${speechId}-i${intensity||3}`;
     let audioUrl = audioCache.get(cacheKey);
     if (!audioUrl) {
       setLoading(true);
+      setError(null);
       try {
         const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
           method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
           body: JSON.stringify({ text, emotion, intensity: intensity || 3 }),
         });
+        if (!response.ok) {
+          const detail = await extractResponseError(response);
+          throw new Error(detail || "TTS failed");
+        }
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("audio")) {
+          const detail = await extractResponseError(response.clone());
+          throw new Error(detail || `Unexpected content type: ${contentType}`);
+        }
         const contentType = response.headers.get("Content-Type") || "";
         if (contentType.includes("application/json")) {
           const data = await response.json();
@@ -119,27 +177,541 @@ function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {
         }
         if (!response.ok) throw new Error(`TTS failed`);
         const audioBlob = await response.blob();
+        if (audioBlob.size < 1000) throw new Error("Empty audio");
         audioUrl = URL.createObjectURL(audioBlob);
+        audioCache.set(speechId, audioUrl);
+        setUsingFallback(false);
+      } catch (err) {
+        console.error("Speech playback failed", err);
         setCachedAudio(cacheKey, audioUrl);
       } catch {
         setLoading(false);
-        const u = new SpeechSynthesisUtterance(text); u.lang = "cs-CZ"; u.rate = 0.82;
-        u.onend = () => setPlaying(false); u.onerror = () => setPlaying(false);
-        setPlaying(true); window.speechSynthesis.speak(u); return;
+        setUsingFallback(true);
+        const message = err instanceof Error ? err.message : "Prémiový hlas se teď nenačetl. Zkus to prosím znovu.";
+        setError(message);
+        return;
       }
       setLoading(false);
     }
     const audio = new Audio(audioUrl); audioRef.current = audio;
+    audio.onended = () => setPlaying(false);
+    audio.onerror = () => {
+      setPlaying(false);
+      setError("Přehrání hlasu selhalo. Zkus to prosím znovu.");
+    };
+    setUsingFallback(false);
+    setError(null);
+    setPlaying(true);
+    audio.play().catch(() => {
+      setPlaying(false);
+      setError("Přehrání hlasu selhalo. Zkus to prosím znovu.");
+    });
+  };
+  useEffect(() => { return () => { stopPlayback(); }; }, []);
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <button onClick={play} disabled={loading} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:12,cursor:loading?"wait":"pointer",fontFamily:"inherit",width:"100%"}}>
+        <span style={{fontSize:18,color:T.accent}}>{loading?"⏳":playing?"■":"▶"}</span>
+        <span style={{color:T.t1,fontSize:13,fontWeight:600}}>{loading?"Generuji hlas...":usingFallback?"Hlas potřebuje zkusit znovu":label}</span>
+        {playing && <span style={{color:T.accent,fontSize:11,marginLeft:"auto"}}>🔊 Hraje</span>}
+      </button>
+      {error && <div style={{color:T.red,fontSize:12,fontWeight:700}}>{error}</div>}
+    </div>
+  );
+}
+
+function PremiumLockCard({
+  title,
+  body,
+  bullets,
+  onAction,
+  cta = "Odemknout Monkey Premium",
+}: {
+  title: string;
+  body: string;
+  bullets: string[];
+  onAction?: () => void;
+  cta?: string;
+}) {
+  return (
+    <div style={{background:`linear-gradient(135deg, ${T.accent}14, ${T.purple}10)`,border:`1px solid ${T.accent}30`,borderRadius:20,padding:18}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+        <span style={{fontSize:18}}>🔒</span>
+        <span style={{color:T.accent,fontSize:12,fontWeight:900,letterSpacing:0.6}}>MONKEY PREMIUM</span>
+      </div>
+      <div style={{color:T.t1,fontSize:18,fontWeight:900,marginBottom:6}}>{title}</div>
+      <div style={{color:T.t2,fontSize:13,lineHeight:1.6,marginBottom:12}}>{body}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+        {bullets.map((bullet) => (
+          <div key={bullet} style={{color:T.t1,fontSize:12,display:"flex",alignItems:"center",gap:8}}>
+            <span style={{color:T.teal}}>✓</span>
+            <span>{bullet}</span>
+          </div>
+        ))}
+      </div>
+      {onAction && (
+        <button
+          onClick={onAction}
+          style={{width:"100%",padding:"12px 16px",background:`linear-gradient(135deg, ${T.accent}, #E06520)`,border:"none",borderRadius:14,color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+        >
+          {cta}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function UpgradeScreen({ onCopyAsk }: { onCopyAsk: () => void }) {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{background:`linear-gradient(135deg, ${T.accent}16, ${T.purple}10)`,border:`1px solid ${T.accent}30`,borderRadius:22,padding:20}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+          <span style={{fontSize:20}}>👑</span>
+          <span style={{color:T.accent,fontSize:12,fontWeight:900,letterSpacing:0.6}}>MONKEY PREMIUM</span>
+        </div>
+        <div style={{color:T.t1,fontSize:24,fontWeight:900,marginBottom:6}}>799 Kč / rok</div>
+        <div style={{color:T.t2,fontSize:13,lineHeight:1.65}}>
+          Aplikace, za kterou budou rodiče nejspíš rádi platit, protože nepřidává další chaos. Pomáhá ti zklidnit hlavu, zvládat konflikty a mít doma méně výbuchů.
+        </div>
+      </div>
+
+      <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:18,padding:18}}>
+        <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:10}}>Co premium opravdu odemyká</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {[
+            "AI Opičák bez limitu, když se to sype večer nebo po hádce",
+            "SOS hudba podle nálady a intenzity",
+            "Prémiové rage packy, Monkey shorts a hlubší knihovna",
+            "Pokročilé insighty a lepší doporučení podle historie",
+          ].map((line) => (
+            <div key={line} style={{display:"flex",gap:8,color:T.t2,fontSize:12,lineHeight:1.55}}>
+              <span style={{color:T.teal}}>✓</span>
+              <span>{line}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{background:`linear-gradient(135deg, ${T.blue}10, ${T.teal}08)`,border:`1px solid ${T.blue}25`,borderRadius:18,padding:18}}>
+        <div style={{color:T.t1,fontSize:15,fontWeight:800,marginBottom:8}}>Jak to říct rodičům</div>
+        <div style={{color:T.t2,fontSize:12,lineHeight:1.65,marginBottom:12}}>
+          Ne tlak. Ne guilt trip. Jen normální zpráva o tom, že ti to pomáhá.
+        </div>
+        <div style={{padding:12,background:"rgba(255,255,255,0.03)",border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,fontSize:12,lineHeight:1.65,marginBottom:12}}>
+          Ahoj, tahle appka mi fakt pomáhá uklidnit se, když mám stres nebo hádku. Premium stojí 799 Kč na rok a má chat, lepší obsah a SOS věci navíc. Myslím, že by mi to reálně pomohlo být víc v klidu doma i ve škole. Mohli bychom to prosím zkusit?
+        </div>
+        <button
+          onClick={onCopyAsk}
+          style={{width:"100%",padding:"12px 16px",background:T.tealDim,border:`1px solid ${T.teal}35`,borderRadius:14,color:T.teal,fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+        >
+          Zkopírovat zprávu pro rodiče
+        </button>
+      </div>
+
+      <div style={{color:T.t3,fontSize:11,lineHeight:1.6,textAlign:"center"}}>
+        Silný pitch ano. Manipulace ne. Ta appka má rodičům dávat smysl, ne je tlačit.
+      </div>
+    </div>
+  );
+}
+
+function toEmbedUrl(url: string) {
+  const match = url.match(/(?:v=|youtu\.be\/)([^?&]+)/);
+  return match
+    ? `https://www.youtube.com/embed/${match[1]}?rel=0&modestbranding=1&playsinline=1&cc_load_policy=1&cc_lang_pref=cs`
+    : url;
+}
+
+function formatContentMeta(item: ContentItem) {
+  const formatMap: Record<ContentItem["format"], string> = {
+    speech: "Řeč",
+    video_short: "Short",
+    external_embed: "YouTube",
+    education: "Pochop to",
+    chat_prompt: "Chat startér",
+  };
+  return `${formatMap[item.format]} · ${item.durationSeconds}s`;
+}
+
+function getShortVisual(item: ContentItem) {
+  if (item.mood.includes("anger")) {
+    return {
+      image: monkeyAngry,
+      glow: T.red,
+      gradient: `linear-gradient(180deg, rgba(255,59,92,0.24), rgba(10,12,19,0.92))`,
+      motionClass: "anim-shortRage",
+    };
+  }
+  if (item.mood.includes("anxiety") || item.mood.includes("sadness")) {
+    return {
+      image: monkeyAnxious,
+      glow: T.blue,
+      gradient: `linear-gradient(180deg, rgba(74,143,255,0.22), rgba(10,12,19,0.92))`,
+      motionClass: "anim-shortResolve",
+    };
+  }
+  return {
+    image: monkeyHero,
+    glow: T.accent,
+    gradient: `linear-gradient(180deg, rgba(255,122,47,0.22), rgba(10,12,19,0.92))`,
+    motionClass: "anim-shortResolve",
+  };
+}
+
+function MonkeyShortPlayer({
+  item,
+  onClose,
+}: {
+  item: ContentItem;
+  onClose: () => void;
+}) {
+  const lines = useMemo(
+    () => (item.shortLines && item.shortLines.length > 0 ? item.shortLines : [item.hook]),
+    [item.hook, item.shortLines]
+  );
+  const [lineIndex, setLineIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voicePlaying, setVoicePlaying] = useState(false);
+  const shortVisual = getShortVisual(item);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const timersRef = useRef<number[]>([]);
+
+  const clearCaptionTimers = useCallback(() => {
+    timersRef.current.forEach((timer) => window.clearTimeout(timer));
+    timersRef.current = [];
+  }, []);
+
+  const runCaptionSequence = useCallback((totalMs: number) => {
+    clearCaptionTimers();
+    setLineIndex(0);
+    if (lines.length <= 1) return;
+    const wordCounts = lines.map((line) => Math.max(1, line.trim().split(/\s+/).length));
+    const totalWords = wordCounts.reduce((sum, count) => sum + count, 0);
+    let elapsed = 0;
+    for (let i = 1; i < lines.length; i += 1) {
+      elapsed += (wordCounts[i - 1] / totalWords) * totalMs;
+      const timer = window.setTimeout(() => setLineIndex(i), elapsed);
+      timersRef.current.push(timer);
+    }
+  }, [clearCaptionTimers, lines]);
+
+  useEffect(() => {
+    if (!playing || voicePlaying) return;
+    const totalMs = item.durationSeconds * 1000;
+    runCaptionSequence(totalMs);
+    const endTimer = window.setTimeout(() => {
+      setLineIndex(lines.length - 1);
+      setPlaying(false);
+    }, totalMs);
+    timersRef.current.push(endTimer);
+    return () => clearCaptionTimers();
+  }, [clearCaptionTimers, item.durationSeconds, lines.length, playing, runCaptionSequence, voicePlaying]);
+
+  useEffect(() => {
+    return () => {
+      clearCaptionTimers();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [clearCaptionTimers]);
+
+  const progress = ((lineIndex + 1) / lines.length) * 100;
+  const fullText = item.text || lines.join(" ");
+  const shareText = `${item.title}\n\n${lines[lineIndex]}\n\nMonkey Mind`;
+
+  const playVoice = async () => {
+    if (voicePlaying && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+      setVoicePlaying(false);
+      setVoiceLoading(false);
+      clearCaptionTimers();
+      setLineIndex(0);
+      setPlaying(false);
+      return;
+    }
+
+    setVoiceError(null);
+    setVoiceLoading(true);
+    try {
+      let audioUrl = audioCache.get(`short-${item.id}`);
+      if (!audioUrl) {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          body: JSON.stringify({ text: fullText, emotion: item.emotion || "all" }),
+        });
+        if (!response.ok) throw new Error("TTS failed");
+        const audioBlob = await response.blob();
+        if (audioBlob.size < 1000) throw new Error("Empty audio");
+        audioUrl = URL.createObjectURL(audioBlob);
+        audioCache.set(`short-${item.id}`, audioUrl);
+      }
+      const audio = new Audio(audioUrl);
+      audio.preload = "auto";
+      audioRef.current = audio;
+      audio.onended = () => {
+        setVoicePlaying(false);
+        setVoiceLoading(false);
+        setPlaying(false);
+      };
+      audio.onerror = () => {
+        setVoicePlaying(false);
+        setVoiceLoading(false);
+        setPlaying(false);
+        setVoiceError("Prémiový hlas teď není dostupný.");
+      };
+      setLineIndex(0);
+      setPlaying(true);
+      runCaptionSequence(item.durationSeconds * 1000);
+      await audio.play();
+      setVoicePlaying(true);
+      setVoiceLoading(false);
+    } catch (error) {
+      console.error("Monkey short voice failed", error);
+      setVoiceLoading(false);
+      setVoicePlaying(false);
+      setVoiceError("Prémiový hlas se nepodařilo načíst. Zkus to prosím znovu.");
+    }
+  };
+
+  const shareShort = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: item.title,
+          text: shareText,
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(shareText);
+    } catch (error) {
+      console.error("Share failed", error);
+    }
+  };
+
+  return (
+    <div style={{width:"100%",borderRadius:24,overflow:"hidden",background:shortVisual.gradient,border:`1px solid ${shortVisual.glow}55`,boxShadow:`0 16px 40px ${shortVisual.glow}25`,position:"relative",marginTop:12}}>
+      <div style={{padding:18,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+        <div>
+          <div style={{color:T.t3,fontSize:10,fontWeight:900,letterSpacing:0.5}}>MONKEY SHORT</div>
+          <div style={{color:T.t1,fontSize:15,fontWeight:800}}>{item.title}</div>
+        </div>
+        <button onClick={onClose} style={{width:36,height:36,borderRadius:"50%",border:`1px solid ${T.border}`,background:"rgba(255,255,255,0.04)",color:T.t1,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+      </div>
+
+      <div style={{padding:"0 18px 18px"}}>
+        <div style={{height:6,borderRadius:99,background:"rgba(255,255,255,0.08)",overflow:"hidden",marginBottom:16}}>
+          <div style={{height:"100%",width:`${progress}%`,background:`linear-gradient(90deg, ${shortVisual.glow}, ${T.accent})`,transition:"width .35s ease"}} />
+        </div>
+
+        <div style={{borderRadius:24,padding:"22px 18px 18px",background:"rgba(8,10,18,0.52)",border:`1px solid rgba(255,255,255,0.08)`,minHeight:420,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"space-between",position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 50% 18%, ${shortVisual.glow}22, transparent 40%)`,pointerEvents:"none"}} />
+          <div style={{display:"flex",gap:7,alignSelf:"center",marginBottom:6}}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{width:6,height:28 + (i % 3) * 10,borderRadius:99,background:i <= lineIndex ? shortVisual.glow : "rgba(255,255,255,0.12)",opacity:i <= lineIndex ? 1 : 0.5,transform:playing ? `scaleY(${1 + ((i + lineIndex) % 3) * 0.18})` : "scaleY(1)",transition:"all .35s ease"}} />
+            ))}
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+            <div style={{width:128,height:18,borderRadius:"50%",background:`radial-gradient(circle, ${shortVisual.glow}55 0%, rgba(255,255,255,0.08) 45%, transparent 72%)`,filter:"blur(4px)",opacity:0.85}} />
+            <img src={shortVisual.image} alt="" className={shortVisual.motionClass} style={{width:160,height:160,objectFit:"contain",filter:`drop-shadow(0 0 28px ${shortVisual.glow}70)`}} />
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,width:"100%"}}>
+            <div style={{color:T.t3,fontSize:11,fontWeight:700,letterSpacing:0.35}}>SCÉNA {lineIndex + 1} / {lines.length}</div>
+            <div style={{color:T.t1,fontSize:26,fontWeight:900,lineHeight:1.15,textAlign:"center",maxWidth:280,letterSpacing:-0.4}}>
+              {lines[lineIndex]}
+            </div>
+            <div style={{color:T.t2,fontSize:12,lineHeight:1.55,textAlign:"center",maxWidth:300}}>
+              {item.hook}
+            </div>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,width:"100%",marginTop:10}}>
+            <button onClick={() => setPlaying((prev) => !prev)} style={{flex:1,padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+              {playing ? "⏸ Pauza textu" : lineIndex > 0 ? "▶ Pokračovat v textu" : "▶ Spustit text"}
+            </button>
+            <button onClick={playVoice} style={{flex:1,padding:"11px 14px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+              {voiceLoading ? "⏳ Načítám hlas" : voicePlaying ? "■ Zastavit hlas" : "🔊 Přehrát prémiový hlas"}
+            </button>
+            <button onClick={shareShort} style={{gridColumn:"1 / -1",padding:"11px 14px",background:T.tealDim,border:`1px solid ${T.teal}30`,borderRadius:14,color:T.teal,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+              📤 Sdílet / zkopírovat short quote
+            </button>
+          </div>
+          {!voicePlaying && !playing && (
+            <div style={{marginTop:10,color:T.t3,fontSize:12,textAlign:"center"}}>
+              Short čeká na tebe. Nejdřív si můžeš pustit text, nebo rovnou prémiový hlas.
+            </div>
+          )}
+          {voiceError && <div style={{marginTop:10,color:T.red,fontSize:12,fontWeight:700,textAlign:"center"}}>{voiceError}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LibraryCard({
+  item,
+  locked,
+  onUpgrade,
+  onOpenChat,
+  onOpenShort,
+  shortExpanded,
+}: {
+  item: ContentItem;
+  locked: boolean;
+  onUpgrade: () => void;
+  onOpenChat: (prompt: string) => void;
+  onOpenShort: (item: ContentItem) => void;
+  shortExpanded: boolean;
+}) {
+  return (
+    <div style={{background:T.card,border:`1px solid ${locked ? `${T.accent}25` : T.border}`,borderRadius:18,padding:16,display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <span style={{padding:"4px 8px",background:item.access === "premium" ? `${T.accent}18` : T.tealDim,border:`1px solid ${item.access === "premium" ? `${T.accent}35` : `${T.teal}30`}`,borderRadius:99,color:item.access === "premium" ? T.accent : T.teal,fontSize:10,fontWeight:900,letterSpacing:0.4}}>
+          {item.access === "premium" ? "PREMIUM" : "FREE"}
+        </span>
+        <span style={{color:T.t3,fontSize:11,fontWeight:700}}>{formatContentMeta(item)}</span>
+      </div>
+      <div>
+        <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:4}}>{item.title}</div>
+        <div style={{color:T.t2,fontSize:12,lineHeight:1.6}}>{item.hook}</div>
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {item.tags.slice(0, 4).map((tag) => (
+          <span key={tag} style={{padding:"4px 8px",background:"rgba(255,255,255,0.03)",border:`1px solid ${T.border}`,borderRadius:99,color:T.t3,fontSize:10,fontWeight:700}}>
+            #{tag}
+          </span>
+        ))}
+      </div>
+      {item.embedUrl ? (
+        <div style={{borderRadius:14,overflow:"hidden",border:`1px solid ${T.border}`,background:"#000"}}>
+          <iframe
+            title={item.title}
+            src={toEmbedUrl(item.embedUrl)}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            style={{width:"100%",aspectRatio:"16 / 9",border:"none",display:"block"}}
+          />
+        </div>
+      ) : (
+        <div style={{padding:12,background:locked ? `${T.accent}08` : "rgba(255,255,255,0.03)",border:`1px solid ${locked ? `${T.accent}20` : T.border}`,borderRadius:14}}>
+          <div style={{color:T.t1,fontSize:13,fontWeight:700,marginBottom:4}}>
+            {locked ? "Odemkne se v Premium" : "Monkey Mind obsah"}
+          </div>
+          <div style={{color:T.t2,fontSize:12,lineHeight:1.5}}>{item.notes || "Obsah připravený pro rychlou podporu, když to potřebuješ."}</div>
+        </div>
+      )}
+      {!locked && item.format === "speech" && item.text && (
+        <>
+          <div style={{padding:12,background:"rgba(255,255,255,0.03)",border:`1px solid ${T.border}`,borderRadius:14,color:T.t2,fontSize:12,lineHeight:1.6}}>
+            {item.text}
+          </div>
+          <SpeechPlayer text={item.text} label="Přehraj obsah" speechId={`library-${item.id}`} emotion={item.emotion || "all"} />
+        </>
+      )}
+      {!locked && item.format === "education" && item.educationPoints && (
+        <div style={{padding:12,background:"rgba(255,255,255,0.03)",border:`1px solid ${T.border}`,borderRadius:14,display:"flex",flexDirection:"column",gap:8}}>
+          {item.educationPoints.map((point) => (
+            <div key={point} style={{color:T.t2,fontSize:12,lineHeight:1.55,display:"flex",gap:8}}>
+              <span style={{color:T.accent,fontWeight:900}}>•</span>
+              <span>{point}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {!locked && item.format === "chat_prompt" && item.chatPrompt && (
+        <button
+          onClick={() => onOpenChat(item.chatPrompt!)}
+          style={{padding:"11px 14px",background:T.tealDim,border:`1px solid ${T.teal}35`,borderRadius:12,color:T.teal,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+        >
+          Otevřít v Opičákovi
+        </button>
+      )}
+      {!locked && item.embedUrl && item.chatPrompt && (
+        <button
+          onClick={() => onOpenChat(item.chatPrompt!)}
+          style={{padding:"11px 14px",background:T.tealDim,border:`1px solid ${T.teal}35`,borderRadius:12,color:T.teal,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+        >
+          Dokoukal/a jsem to, otevřít reflexi v Opičákovi
+        </button>
+      )}
+      {!locked && item.format === "video_short" && (
+        <>
+          <button
+            onClick={() => onOpenShort(item)}
+          style={{padding:"11px 14px",background:`linear-gradient(135deg, ${T.purple}16, ${T.blue}12)`,border:`1px solid ${T.purple}35`,borderRadius:12,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+          >
+            {shortExpanded ? "Obnovit Monkey short" : "Spustit Monkey short"}
+          </button>
+          {shortExpanded && <MonkeyShortPlayer item={item} onClose={() => onOpenShort(item)} />}
+        </>
+      )}
+      {locked && (
+        <button
+          onClick={onUpgrade}
+          style={{padding:"11px 14px",background:`linear-gradient(135deg, ${T.accent}, #E06520)`,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+        >
+          Odemknout premium obsah
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ContentLibrary({
+  isPremium,
+  onUpgrade,
+  onOpenChat,
+}: {
+  isPremium: boolean;
+  onUpgrade: () => void;
+  onOpenChat: (prompt: string) => void;
+}) {
+  const freeItems = CONTENT_BLUEPRINT.filter((item) => FREE_TASTE_LAYER_IDS.includes(item.id as typeof FREE_TASTE_LAYER_IDS[number]));
+  const premiumItems = CONTENT_BLUEPRINT.filter((item) => PREMIUM_HERO_IDS.includes(item.id as typeof PREMIUM_HERO_IDS[number]));
+  const [activeShortId, setActiveShortId] = useState<string | null>(null);
+  const toggleShort = (item: ContentItem) => {
+    setActiveShortId((current) => current === item.id ? null : item.id);
     audio.onended = () => { setPlaying(false); onComplete?.(); }; audio.onerror = () => setPlaying(false);
     setPlaying(true); audio.play();
   };
-  useEffect(() => { return () => { audioRef.current?.pause(); window.speechSynthesis.cancel(); }; }, []);
+
   return (
-    <button onClick={play} disabled={loading} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:12,cursor:loading?"wait":"pointer",fontFamily:"inherit",width:"100%"}}>
-      <span style={{fontSize:18,color:T.accent}}>{loading?"⏳":playing?"■":"▶"}</span>
-      <span style={{color:T.t1,fontSize:13,fontWeight:600}}>{loading?"Generuji hlas...":label}</span>
-      {playing && <span style={{color:T.accent,fontSize:11,marginLeft:"auto"}}>🔊 Hraje</span>}
-    </button>
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+      <div>
+        <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:6}}>Zdarma právě teď</div>
+        <div style={{color:T.t2,fontSize:12,marginBottom:12,lineHeight:1.6}}>
+          Rychlé zásahy, bezpečí a jeden silný motivační video pick, který si můžeš pustit hned.
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {freeItems.map((item) => (
+            <LibraryCard key={item.id} item={item} locked={false} onUpgrade={onUpgrade} onOpenChat={onOpenChat} onOpenShort={toggleShort} shortExpanded={activeShortId === item.id} />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+          <span style={{color:T.accent,fontSize:16,fontWeight:900}}>Monkey Premium</span>
+          <span style={{color:T.t3,fontSize:11}}>Více obsahu, větší zásah</span>
+        </div>
+        <div style={{color:T.t2,fontSize:12,marginBottom:12,lineHeight:1.6}}>
+          Tady najdeš delší video výběr, Monkey shorts, silnější speech packy a rychlé vstupy do Opičáka.
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {premiumItems.map((item) => (
+            <LibraryCard key={item.id} item={item} locked={!isPremium} onUpgrade={onUpgrade} onOpenChat={onOpenChat} onOpenShort={toggleShort} shortExpanded={activeShortId === item.id} />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -149,9 +721,9 @@ function BreathingExercise({type="box", onComplete}: {type?: string; onComplete?
   const [completed, setCompleted] = useState(false);
   const [phase, setPhase] = useState("ready");
   const [count, setCount] = useState(0);
-  const timerRef = useRef<any>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseRef = useRef(0);
-  const patterns: Record<string, any> = {
+  const patterns: Record<string, BreathingPattern> = {
     box:{name:"Box",phases:[{label:"Nádech",dur:4,color:T.teal},{label:"Drž",dur:4,color:T.blue},{label:"Výdech",dur:4,color:T.accent},{label:"Drž",dur:4,color:T.purple}]},
     sleep:{name:"4-7-8",phases:[{label:"Nádech",dur:4,color:T.teal},{label:"Drž",dur:7,color:T.blue},{label:"Výdech",dur:8,color:T.accent}]},
   };
@@ -308,7 +880,7 @@ function QuestsTab({ xp, completedQuests, onEquipSkin, equippedSkin }: { xp: num
 // ── MONKEY CHAT (AI) ──
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
-function MonkeyChat() {
+function MonkeyChat({ isPremium, onUpgrade, initialPrompt }: { isPremium: boolean; onUpgrade: () => void; initialPrompt?: string | null }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -318,6 +890,38 @@ function MonkeyChat() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (initialPrompt) {
+      setInput(initialPrompt);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [initialPrompt]);
+
+  if (!isPremium) {
+    return (
+      <div style={{ paddingTop: 8 }}>
+        <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:12,padding:"8px 0 12px",borderBottom:`1px solid ${T.border}`,marginBottom:16}}>
+          <img src={monkeyChat} alt="" style={{width:48,height:48,objectFit:"contain",borderRadius:14}} />
+          <div>
+            <div style={{color:T.t1,fontSize:18,fontWeight:900}}>Opičák</div>
+            <div style={{color:T.t2,fontSize:12}}>AI parťák je součást Monkey Premium</div>
+          </div>
+        </div>
+        <PremiumLockCard
+          title="AI Opičák pro těžší chvíle"
+          body="Check-in a krizová pomoc zůstávají zdarma. Premium odemyká hlubší rozhovory, follow-up otázky a delší podporu, když se toho děje moc najednou."
+          bullets={[
+            "Neomezený chat s Opičákem",
+            "Hlubší follow-up otázky místo jedné odpovědi",
+            "Personalizovaná podpora podle nálady a důvodu",
+          ]}
+          onAction={onUpgrade}
+          cta="Mrkni na Monkey Premium"
+        />
+      </div>
+    );
+  }
 
   const send = async () => {
     const text = input.trim();
@@ -338,7 +942,8 @@ function MonkeyChat() {
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Něco se pokazilo" }));
-        setMessages(prev => [...prev, { role: "assistant", content: err.error || "Opičák teď nemůže, zkus to znovu 🐵" }]);
+        const detailText = typeof err.details === "string" && err.details.trim() ? `\n${err.details}` : "";
+        setMessages(prev => [...prev, { role: "assistant", content: `${err.error || "Opičák teď nemůže, zkus to znovu 🐵"}${detailText}` }]);
         setIsLoading(false);
         return;
       }
@@ -455,7 +1060,7 @@ function MonkeyChat() {
 }
 
 // ── MOOD INSIGHTS CHARTS (recharts) ──
-function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
+function MoodInsightsCharts({ moodLog }: { moodLog: MoodLogEntry[] }) {
   const [range, setRange] = useState<"week" | "month">("week");
   const moodScore: Record<string, number> = { great: 5, pumped: 4, meh: 3, angry: 2, sad: 2, anxious: 1, awful: 0 };
   const moodColors: Record<string, string> = { great: T.teal, pumped: T.blue, meh: T.accent, angry: T.red, sad: T.purple, anxious: "#FF7A2F", awful: T.red };
@@ -467,9 +1072,9 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
     const date = new Date();
     date.setDate(date.getDate() - d);
     const ds = date.toLocaleDateString("cs-CZ");
-    const dayLogs = moodLog.filter((l: any) => l.ts.startsWith(ds));
+    const dayLogs = moodLog.filter((l) => l.ts.startsWith(ds));
     const avg = dayLogs.length > 0
-      ? dayLogs.reduce((s: number, l: any) => s + (moodScore[l.mood.id] ?? 3), 0) / dayLogs.length
+      ? dayLogs.reduce((s: number, l) => s + (moodScore[l.mood.id] ?? 3), 0) / dayLogs.length
       : null;
     const label = range === "week"
       ? ["Ne","Po","Út","St","Čt","Pá","So"][date.getDay()]
@@ -482,7 +1087,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
   const filteredLogs = range === "week"
     ? moodLog.filter(l => { const d = new Date(); d.setDate(d.getDate() - 7); return new Date(l.ts.replace(/(\d+)\.\s*(\d+)\.\s*(\d+)/, '$3-$2-$1')) >= d; })
     : moodLog;
-  filteredLogs.forEach((l: any) => { counts[l.mood.id] = (counts[l.mood.id] || 0) + 1; });
+  filteredLogs.forEach((l) => { counts[l.mood.id] = (counts[l.mood.id] || 0) + 1; });
   const pieData = Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
     .map(([id, value]) => ({
@@ -493,7 +1098,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
 
   // Top reasons
   const reasonCounts: Record<string, number> = {};
-  filteredLogs.forEach((l: any) => { if (l.reason) reasonCounts[l.reason.id] = (reasonCounts[l.reason.id] || 0) + 1; });
+  filteredLogs.forEach((l) => { if (l.reason) reasonCounts[l.reason.id] = (reasonCounts[l.reason.id] || 0) + 1; });
   const topReasons = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
     .map(([id, value]) => ({ name: REASONS.find(r => r.id === id)?.label || id, value, fill: T.accent }));
 
@@ -531,7 +1136,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
               tickFormatter={(v: number) => ["💀","😰","😢","😐","💪","🔥"][v] || ""} />
             <Tooltip
               contentStyle={{background:"#1a1d2e",border:`1px solid ${T.border}`,borderRadius:12,fontSize:12,color:T.t1}}
-              formatter={(v: any) => [v !== null ? `${Number(v).toFixed(1)} / 5` : "—", "Skóre"]}
+              formatter={(v: number | null) => [v !== null ? `${Number(v).toFixed(1)} / 5` : "—", "Skóre"]}
               labelStyle={{color:T.t2}}
             />
             <Area type="monotone" dataKey="score" stroke={T.accent} strokeWidth={2.5} fill="url(#moodGrad)" dot={{r:3,fill:T.accent,stroke:"none"}} connectNulls={false} />
@@ -548,7 +1153,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
             <YAxis dataKey="name" type="category" tick={{fill:T.t2,fontSize:12,fontWeight:600}} axisLine={false} tickLine={false} width={75} />
             <Tooltip
               contentStyle={{background:"#1a1d2e",border:`1px solid ${T.border}`,borderRadius:12,fontSize:12,color:T.t1}}
-              formatter={(v: any) => [`${v}×`, "Check-iny"]}
+              formatter={(v: number) => [`${v}×`, "Check-iny"]}
               labelStyle={{color:T.t2}}
             />
             <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={20}>
@@ -570,7 +1175,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
               <YAxis dataKey="name" type="category" tick={{fill:T.t2,fontSize:12,fontWeight:600}} axisLine={false} tickLine={false} width={80} />
               <Tooltip
                 contentStyle={{background:"#1a1d2e",border:`1px solid ${T.border}`,borderRadius:12,fontSize:12,color:T.t1}}
-                formatter={(v: any) => [`${v}×`, "Zmíněno"]}
+                formatter={(v: number) => [`${v}×`, "Zmíněno"]}
                 labelStyle={{color:T.t2}}
               />
               <Bar dataKey="value" radius={[0, 8, 8, 0]} fill={T.teal} fillOpacity={0.8} barSize={20} />
@@ -596,15 +1201,49 @@ function MoodInsightsCharts({ moodLog }: { moodLog: any[] }) {
 }
 
 // ── PROFILE TAB (with Mood Insights) ──
+function ProfileTab({
+  moodLog,
+  streakCount,
+  userName,
+  avatar,
+  subscriptionTier,
+  initialSection,
+  onNameChange,
+  onAvatarClick,
+  onSignOut,
+  onUpgrade,
+  onOpenChat,
+  onCopyAsk,
+}: {
+  moodLog: MoodLogEntry[];
+  streakCount: number;
+  userName: string;
+  avatar: string | null;
+  subscriptionTier: SubscriptionTier;
+  initialSection?: "overview" | "premium" | "library" | "insights" | "contacts" | "diary" | "calendar";
+  onNameChange: (n: string) => void;
+  onAvatarClick: () => void;
+  onSignOut: () => void;
+  onUpgrade: () => void;
+  onOpenChat: (prompt: string) => void;
+  onCopyAsk: () => void;
+}) {
+  const [activeSection, setActiveSection] = useState(initialSection || "overview");
+  const [contacts, setContacts] = useState([{name:"",phone:""}]);
 function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut, diaryEntries, sosContacts, onSaveDiary, onSaveContacts, onCompleteQuest, isPremium, onUpgrade}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void; diaryEntries:any[]; sosContacts:{id?:string;name:string;phone:string}[]; onSaveDiary:(content:string)=>void; onSaveContacts:(contacts:{id?:string;name:string;phone:string}[])=>void; onCompleteQuest:(id:string)=>void; isPremium:boolean; onUpgrade:()=>void}) {
   const [activeSection, setActiveSection] = useState("overview");
   const [contacts, setContacts] = useState<{id?:string;name:string;phone:string}[]>(sosContacts.length > 0 ? sosContacts : [{name:"",phone:""}]);
   const [diary, setDiary] = useState("");
   const [diarySaved, setDiarySaved] = useState(false);
   const days = ["Po","Út","St","Čt","Pá","So","Ne"];
+  const isPremium = subscriptionTier === "premium";
+
+  useEffect(() => {
+    if (initialSection) setActiveSection(initialSection);
+  }, [initialSection]);
 
   // Build calendar based on actual dates, not mood log index
-  const calendarWeeks: any[] = [];
+  const calendarWeeks: CalendarDay[][] = [];
   const today = new Date();
   // Show 4 weeks ending today — find the Monday 3 weeks ago
   const startDate = new Date(today);
@@ -615,8 +1254,8 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
   startDate.setDate(startDate.getDate() + mondayOffset);
 
   // Group mood logs by date string
-  const moodByDate: Record<string, any> = {};
-  moodLog.forEach((l: any) => {
+  const moodByDate: Record<string, MoodLogEntry | undefined> = {};
+  moodLog.forEach((l) => {
     // Parse the Czech date format "D. M. YYYY, HH:MM:SS"
     const parts = l.ts.match(/(\d+)\.\s*(\d+)\.\s*(\d+)/);
     if (parts) {
@@ -650,18 +1289,41 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
             <span style={{color:T.accent,fontSize:28,fontWeight:900}}>{streakCount}</span>
             <span style={{color:T.t2,fontSize:13}}>dní v řadě 🔥</span>
           </div>
+          <div style={{display:"inline-flex",alignItems:"center",gap:6,marginTop:10,padding:"6px 10px",background:isPremium?`${T.accent}18`:T.card,border:`1px solid ${isPremium?`${T.accent}45`:T.border}`,borderRadius:99,color:isPremium?T.accent:T.t2,fontSize:11,fontWeight:800}}>
+            <span>{isPremium ? "👑" : "🆓"}</span>
+            <span>{isPremium ? "Monkey Premium" : "Free plán"}</span>
+          </div>
         </div>
       </div>
 
       {/* Section pills */}
       <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:16,paddingBottom:4}}>
-        {[{id:"overview",label:"📊 Přehled"},{id:"insights",label:"🧠 Insights"},{id:"contacts",label:"📞 SOS"},{id:"diary",label:"📝 Deník"},{id:"calendar",label:"📅 Historie"}].map(s=>
+        {[{id:"overview",label:"📊 Přehled"},{id:"premium",label:"👑 Premium"},{id:"library",label:"🎬 Obsah"},{id:"insights",label:"🧠 Insights"},{id:"contacts",label:"📞 SOS"},{id:"diary",label:"📝 Deník"},{id:"calendar",label:"📅 Historie"}].map(s=>
           <button key={s.id} onClick={()=>setActiveSection(s.id)} className="reason-card" style={{padding:"8px 14px",background:activeSection===s.id?T.accentDim:T.card,border:`1px solid ${activeSection===s.id?T.accent:T.border}`,borderRadius:99,color:activeSection===s.id?T.accent:T.t2,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",flexShrink:0}}>{s.label}</button>
         )}
       </div>
 
+      {activeSection==="premium" && (
+        <UpgradeScreen onCopyAsk={onCopyAsk} />
+      )}
+
       {activeSection==="overview" && (
         <div>
+          {!isPremium && (
+            <div style={{marginBottom:16}}>
+              <PremiumLockCard
+                title="Jedeš na free verzi"
+                body="Bezpečí, check-in a základní pomoc zůstávají zdarma. Premium přidává AI chat, SOS hudbu a hlubší insighty, když chceš z appky dostat maximum."
+                bullets={[
+                  "AI Opičák bez limitu",
+                  "SOS hudba podle nálady",
+                  "Pokročilé insighty a trendy",
+                ]}
+                onAction={onUpgrade}
+                cta="Chci vidět Premium"
+              />
+            </div>
+          )}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
             <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:16,textAlign:"center"}}>
               <div style={{color:T.accent,fontSize:28,fontWeight:900}}>{moodLog.length}</div>
@@ -676,7 +1338,7 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
             <div style={{marginBottom:20}}>
               <div style={{color:T.t1,fontSize:14,fontWeight:700,marginBottom:8}}>Poslední nálady</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                {moodLog.slice(0,12).map((l:any,i:number) => {
+                {moodLog.slice(0,12).map((l, i:number) => {
                   const m = MOODS.find(x=>x.id===l.mood.id);
                   return <div key={i} style={{padding:"4px 10px",background:T.card,border:`1px solid ${T.border}`,borderRadius:8,fontSize:12,color:T.t2}}>{m?.label} {l.ts.split(",")[1]?.trim()}</div>;
                 })}
@@ -696,7 +1358,18 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
       {activeSection==="insights" && (
         <div>
           <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:12}}>Mood Insights 🧠</div>
-          {moodLog.length < 3 ? (
+          {!isPremium ? (
+            <PremiumLockCard
+              title="Pokročilé insighty"
+              body="Základní check-in je zdarma. Premium ti ukáže trendy nálad, nejčastější spouštěče a osobní vzorce, které se začínají opakovat."
+              bullets={[
+                "Grafy nálad a důvodů v čase",
+                "Osobní vzorce a opičí analýza",
+                "Lepší doporučení podle historie",
+              ]}
+              onAction={onUpgrade}
+            />
+          ) : moodLog.length < 3 ? (
             <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:24,textAlign:"center"}}>
               <img src={monkeyProfile} alt="" className="anim-float" style={{width:60,height:60,objectFit:"contain",margin:"0 auto 12px"}} />
               <div style={{color:T.t2,fontSize:14,lineHeight:1.6}}>Potřebuji aspoň 3 check-iny, abych ti ukázal insights. Pokračuj! 🐵</div>
@@ -704,6 +1377,16 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
           ) : (
             <MoodInsightsCharts moodLog={moodLog} />
           )}
+        </div>
+      )}
+
+      {activeSection==="library" && (
+        <div>
+          <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:6}}>Monkey knihovna</div>
+          <div style={{color:T.t2,fontSize:12,marginBottom:14,lineHeight:1.6}}>
+            Vyber si rychlý speech, silný short nebo motivační video. Nejlepší kousky jsou připravené zdarma, hlubší obsah odemyká Premium.
+          </div>
+          <ContentLibrary isPremium={isPremium} onUpgrade={onUpgrade} onOpenChat={onOpenChat} />
         </div>
       )}
 
@@ -769,9 +1452,9 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
           <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:6}}>
             {days.map(d=><div key={d} style={{textAlign:"center",color:T.t3,fontSize:11,fontWeight:600,padding:4}}>{d}</div>)}
           </div>
-          {calendarWeeks.map((week:any[],wi:number)=>(
+          {calendarWeeks.map((week, wi:number)=>(
             <div key={wi} style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:4}}>
-              {week.map((day:any,di:number)=>{
+              {week.map((day, di:number)=>{
                 const m = day ? MOODS.find(x=>x.id===day.mood.id) : null;
                 return <div key={di} style={{aspectRatio:"1",borderRadius:8,background:m?`${m.color}20`:T.card,border:`1px solid ${m?`${m.color}30`:T.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
                   {m && <img src={MOOD_MONKEY[m.id]} alt="" style={{width:20,height:20,objectFit:"contain"}}/>}
@@ -847,7 +1530,7 @@ const SOS_MUSIC_GENRES = [
   {id:"rage",label:"💥 Rage",sub:"Rozbi to",prompt:"aggressive trap beat, heavy 808 bass, dark distorted synths, raw energy, breakbeat drops, 140bpm",color:"#FF3B5C"},
 ];
 
-function SOSOverlay({onClose}: {onClose:()=>void}) {
+function SOSOverlay({onClose, isPremium, onUpgrade}: {onClose:()=>void; isPremium: boolean; onUpgrade: ()=>void}) {
   const [screen, setScreen] = useState<"menu"|"speech"|"breathe"|"music">("menu");
   const [sosSpeech, setSosSpeech] = useState<typeof SOS_SPEECHES[0]|null>(null);
   const [musicGenre, setMusicGenre] = useState<typeof SOS_MUSIC_GENRES[0]|null>(null);
@@ -864,10 +1547,17 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
   };
 
   const webAudioCtxRef = useRef<AudioContext|null>(null);
-  const webAudioNodesRef = useRef<AudioNode[]>([]);
+  const webAudioNodesRef = useRef<AudioNodeWithStop[]>([]);
 
   const stopWebAudio = () => {
-    webAudioNodesRef.current.forEach(n => { try { (n as any).stop?.(); (n as any).disconnect?.(); } catch {} });
+    webAudioNodesRef.current.forEach((node) => {
+      try {
+        node.stop?.();
+        node.disconnect?.();
+      } catch (error) {
+        console.debug("Web audio node cleanup skipped", error);
+      }
+    });
     webAudioNodesRef.current = [];
     if (webAudioCtxRef.current) { webAudioCtxRef.current.close().catch(() => {}); webAudioCtxRef.current = null; }
   };
@@ -876,7 +1566,7 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
     stopWebAudio();
     const ctx = new AudioContext();
     webAudioCtxRef.current = ctx;
-    const nodes: AudioNode[] = [];
+    const nodes: AudioNodeWithStop[] = [];
     const master = ctx.createGain();
     master.gain.value = 0.25;
     master.connect(ctx.destination);
@@ -886,6 +1576,8 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
       calm:  { freqs: [220, 277, 330], type: "sine", lfoRate: 0.1, filterFreq: 800 },
       sad:   { freqs: [196, 233, 294], type: "triangle", lfoRate: 0.08, filterFreq: 600 },
       happy: { freqs: [262, 330, 392, 523], type: "sine", lfoRate: 0.2, filterFreq: 2000 },
+      lofi:  { freqs: [196, 247, 294], type: "triangle", lfoRate: 0.12, filterFreq: 950 },
+      rage:  { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
       metal: { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
       lofi:  { freqs: [196, 247, 294, 370], type: "triangle", lfoRate: 0.05, filterFreq: 500 },
       rage:  { freqs: [82, 123, 165], type: "sawtooth", lfoRate: 0.5, filterFreq: 1800 },
@@ -955,14 +1647,15 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
       audio.onerror = () => { setMusicPlaying(false); setMusicLoading(false); setMusicError("Přehrávání selhalo"); };
       await audio.play();
       setMusicPlaying(true);
-    } catch (e: any) {
+    } catch (error) {
       // Fallback: Web Audio API ambient tones
       console.log("API failed, using Web Audio fallback for genre:", genre.id);
       try {
         playWebAudioFallback(genre);
         setMusicPlaying(true);
         setMusicError(null);
-      } catch {
+      } catch (fallbackError) {
+        console.error("SOS music fallback failed", fallbackError, error);
         setMusicError("Generování selhalo. Zkus to znovu.");
       }
     }
@@ -970,10 +1663,27 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
   };
 
   const stopMusic = () => {
-    if (musicAudioRef.current) { musicAudioRef.current.pause(); musicAudioRef.current = null; }
+    if (musicAudioRef.current) {
+      musicAudioRef.current.pause();
+      musicAudioRef.current.currentTime = 0;
+      musicAudioRef.current = null;
+    }
     stopWebAudio();
     setMusicPlaying(false);
+    setMusicLoading(false);
+    setMusicGenre(null);
   };
+
+  useEffect(() => {
+    return () => {
+      if (musicAudioRef.current) {
+        musicAudioRef.current.pause();
+        musicAudioRef.current.currentTime = 0;
+        musicAudioRef.current = null;
+      }
+      stopWebAudio();
+    };
+  }, []);
 
   const nextGenre = () => {
     if (!musicGenre) return;
@@ -1000,11 +1710,17 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
       {[
         {img:monkeyAngry,label:"Motivační řeč",sub:"Náhodná krizová řeč od opice",color:T.accent,action:pickRandomSpeech},
         {img:monkeyZen,label:"Box Breathing",sub:"4-4-4-4 dýchání na uklidnění",color:T.teal,action:()=>setScreen("breathe")},
-        {img:monkeyMusic,label:"Hudba",sub:"Metal, klid, smutek, energie…",color:T.purple,action:()=>setScreen("music")},
+        {img:monkeyMusic,label:"Hudba",sub:isPremium?"Metal, klid, smutek, energie…":"Premium: SOS hudba pro uvolnění",color:T.purple,action:()=>setScreen("music"),premium:!isPremium},
       ].map((o,i)=>
         <button key={i} onClick={o.action} className="reason-card" style={{display:"flex",alignItems:"center",gap:14,padding:"16px 20px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16,width:"100%",maxWidth:360,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
           <img src={o.img} alt={o.label} style={{width:50,height:50,objectFit:"contain",borderRadius:14}} loading="lazy" />
-          <div><div style={{color:T.t1,fontSize:16,fontWeight:700}}>{o.label}</div><div style={{color:T.t2,fontSize:12}}>{o.sub}</div></div>
+          <div style={{flex:1}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{color:T.t1,fontSize:16,fontWeight:700}}>{o.label}</div>
+              {o.premium && <span style={{padding:"3px 8px",background:`${T.accent}18`,border:`1px solid ${T.accent}35`,borderRadius:99,color:T.accent,fontSize:9,fontWeight:900,letterSpacing:0.4}}>PREMIUM</span>}
+            </div>
+            <div style={{color:T.t2,fontSize:12}}>{o.sub}</div>
+          </div>
         </button>
       )}
       <a href="tel:116111" style={{display:"flex",alignItems:"center",gap:12,padding:"14px 20px",background:T.redDim,border:`1px solid ${T.red}40`,borderRadius:16,width:"100%",maxWidth:360,textDecoration:"none"}}>
@@ -1044,34 +1760,52 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
   if (screen === "music") return (
     <div style={overlay} className="anim-fadeIn">
       {backBtn("menu")}
-      <img src={monkeyMusic} alt="Music" style={{width:70,height:70,objectFit:"contain",marginTop:8}} className={musicPlaying ? "anim-monkeyBob" : ""} />
-      <div style={{color:T.t1,fontSize:20,fontWeight:800,textAlign:"center"}}>Jakou hudbu potřebuješ?</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,width:"100%",maxWidth:380}}>
-        {SOS_MUSIC_GENRES.map(g => (
-          <button key={g.id} onClick={() => playMusic(g)} disabled={musicLoading}
-            className="reason-card"
-            style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"16px 12px",background: musicGenre?.id === g.id ? `${g.color}20` : T.card,border:`1px solid ${musicGenre?.id === g.id ? g.color : T.border}`,borderRadius:14,cursor:musicLoading?"wait":"pointer",fontFamily:"inherit",textAlign:"center"}}>
-            <div style={{fontSize:28}}>{g.label.split(" ")[0]}</div>
-            <div style={{color:T.t1,fontSize:14,fontWeight:700}}>{g.label.split(" ").slice(1).join(" ")}</div>
-            <div style={{color:T.t2,fontSize:11}}>{g.sub}</div>
-          </button>
-        ))}
-      </div>
-      {musicLoading && (
-        <div style={{color:T.accent,fontSize:14,fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
-          <span style={{animation:"pulse 1.5s infinite"}}>⏳</span> Generuji hudbu… (může trvat ~15s)
+      {!isPremium ? (
+        <div style={{width:"100%",maxWidth:380,display:"flex",flexDirection:"column",gap:16,marginTop:8}}>
+          <img src={monkeyMusic} alt="Music" style={{width:70,height:70,objectFit:"contain",margin:"0 auto"}} />
+          <PremiumLockCard
+            title="SOS hudba pro intenzivní chvíle"
+            body="Krizové řeči, dýchání a bezpečí zůstávají zdarma. Premium přidává generovanou hudbu podle nálady, když potřebuješ vypnout hlavu nebo vypustit tlak."
+            bullets={[
+              "Metal, klid, smutek, lo-fi i rage režim",
+              "Hudba laděná podle emoční intenzity",
+              "Rychlý reset bez hledání playlistu jinde",
+            ]}
+            onAction={onUpgrade}
+          />
         </div>
-      )}
-      {musicError && !musicLoading && (
-        <div style={{color:T.red,fontSize:13,fontWeight:600,textAlign:"center",padding:"8px 16px",background:T.redDim,borderRadius:10,maxWidth:340}}>
-          ⚠️ {musicError}
-        </div>
-      )}
-      {musicPlaying && musicGenre && (
-        <div style={{display:"flex",gap:10,marginTop:4}}>
-          <button onClick={stopMusic} style={{padding:"10px 24px",background:T.redDim,border:`1px solid ${T.red}40`,borderRadius:99,color:T.red,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>■ Stop</button>
-          <button onClick={nextGenre} style={{padding:"10px 24px",background:T.accentDim,border:`1px solid ${T.accent}40`,borderRadius:99,color:T.accent,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>🔀 Další žánr</button>
-        </div>
+      ) : (
+        <>
+          <img src={monkeyMusic} alt="Music" style={{width:70,height:70,objectFit:"contain",marginTop:8}} className={musicPlaying ? "anim-monkeyBob" : ""} />
+          <div style={{color:T.t1,fontSize:20,fontWeight:800,textAlign:"center"}}>Jakou hudbu potřebuješ?</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,width:"100%",maxWidth:380}}>
+            {SOS_MUSIC_GENRES.map(g => (
+              <button key={g.id} onClick={() => playMusic(g)} disabled={musicLoading}
+                className="reason-card"
+                style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"16px 12px",background: musicGenre?.id === g.id ? `${g.color}20` : T.card,border:`1px solid ${musicGenre?.id === g.id ? g.color : T.border}`,borderRadius:14,cursor:musicLoading?"wait":"pointer",fontFamily:"inherit",textAlign:"center"}}>
+                <div style={{fontSize:28}}>{g.label.split(" ")[0]}</div>
+                <div style={{color:T.t1,fontSize:14,fontWeight:700}}>{g.label.split(" ").slice(1).join(" ")}</div>
+                <div style={{color:T.t2,fontSize:11}}>{g.sub}</div>
+              </button>
+            ))}
+          </div>
+          {musicLoading && (
+            <div style={{color:T.accent,fontSize:14,fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
+              <span style={{animation:"pulse 1.5s infinite"}}>⏳</span> Generuji hudbu… (může trvat ~15s)
+            </div>
+          )}
+          {musicError && !musicLoading && (
+            <div style={{color:T.red,fontSize:13,fontWeight:600,textAlign:"center",padding:"8px 16px",background:T.redDim,borderRadius:10,maxWidth:340}}>
+              ⚠️ {musicError}
+            </div>
+          )}
+          {musicPlaying && musicGenre && (
+            <div style={{display:"flex",gap:10,marginTop:4}}>
+              <button onClick={stopMusic} style={{padding:"10px 24px",background:T.redDim,border:`1px solid ${T.red}40`,borderRadius:99,color:T.red,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>■ Stop</button>
+              <button onClick={nextGenre} style={{padding:"10px 24px",background:T.accentDim,border:`1px solid ${T.accent}40`,borderRadius:99,color:T.accent,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>🔀 Další žánr</button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -1085,6 +1819,7 @@ function SOSOverlay({onClose}: {onClose:()=>void}) {
 export default function Index() {
   const { signOut } = useAuth();
   const cloud = useCloudData();
+  const { moodLog, xp, streakCount, completedQuests, equippedSkin, subscriptionTier, userName, lastCheckinDate, loading: cloudLoading } = cloud;
   const premium = usePremium();
   const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName, lastCheckinDate, loading: cloudLoading } = cloud;
 
@@ -1098,6 +1833,12 @@ export default function Index() {
   const [xpPopup, setXpPopup] = useState<{xp:number;label:string}|null>(null);
   const [levelUp, setLevelUp] = useState<{level:number;skin?:typeof MONKEY_SKINS[0]|null}|null>(null);
   const [step, setStep] = useState(1);
+  const [selectedMood, setSelectedMood] = useState<MoodOption | null>(null);
+  const [selectedReason, setSelectedReason] = useState<ReasonOption | null>(null);
+  const [recs, setRecs] = useState<RecommendationBundle | null>(null);
+  const isPremium = subscriptionTier === "premium";
+  const [profileSection, setProfileSection] = useState<"overview"|"premium"|"library"|"insights"|"contacts"|"diary"|"calendar">("overview");
+  const [chatSeed, setChatSeed] = useState<string | null>(null);
   const [sliderIndex, setSliderIndex] = useState(3); // middle = meh
   const [selectedMood, setSelectedMood] = useState<any>(null);
   const [selectedReason, setSelectedReason] = useState<any>(null);
@@ -1120,6 +1861,21 @@ export default function Index() {
 
   // Fetch anonymous peer echo (how many warriors felt each mood today)
   useEffect(() => {
+    if (!cloudLoading && !userName) setShowOnboarding(true);
+  }, [cloudLoading, userName]);
+
+  useEffect(() => {
+    if (!selectedMood) {
+      setSelectedMood(MOODS[2]);
+    }
+  }, [selectedMood]);
+
+  const handleOnboardingComplete = (newName: string, moodId: string) => {
+    cloud.updateName(newName);
+    const mood = MOODS.find((m) => m.id === moodId);
+    if (mood) {
+      setSelectedMood(mood);
+      setStep(1);
     supabase.rpc("get_today_mood_counts").then(({ data }) => {
       if (data) {
         const counts: Record<string, number> = {};
@@ -1145,9 +1901,34 @@ export default function Index() {
   };
 
   const handleNameChange = (n: string) => { cloud.updateName(n); };
-  const handleAvatar = (e: any) => {
+  const openUpgrade = () => {
+    setTab("profile");
+    setProfileSection("premium");
+  };
+  const openChatWithPrompt = (prompt: string) => {
+    setChatSeed(prompt);
+    setTab("chat");
+  };
+  const copyParentAsk = async () => {
+    const text = "Ahoj, tahle appka mi fakt pomáhá uklidnit se, když mám stres nebo hádku. Premium stojí 799 Kč na rok a má chat, lepší obsah a SOS věci navíc. Myslím, že by mi to reálně pomohlo být víc v klidu doma i ve škole. Mohli bychom to prosím zkusit?";
+    try {
+      await navigator.clipboard.writeText(text);
+      setXpPopup({ xp: 0, label: "Zpráva pro rodiče zkopírována" });
+    } catch (error) {
+      console.error("Copy failed", error);
+      setXpPopup({ xp: 0, label: "Kopírování se nepovedlo" });
+    }
+  };
+  const handleAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) { const r = new FileReader(); r.onload = (ev: any) => { setAvatar(ev.target.result); }; r.readAsDataURL(f); }
+    if (f) {
+      const r = new FileReader();
+      r.onload = (ev: ProgressEvent<FileReader>) => {
+        const result = ev.target?.result;
+        if (typeof result === "string") setAvatar(result);
+      };
+      r.readAsDataURL(f);
+    }
   };
 
   const completeQuest = (questId: string) => {
@@ -1173,6 +1954,9 @@ export default function Index() {
   };
   const currentSkinImg = MONKEY_SKINS.find(s => s.id === equippedSkin)?.img || monkeyHero;
 
+  const selectMood = (m: MoodOption) => { setSelectedMood(m); setStep(1); };
+  const selectReason = (r: ReasonOption) => {
+    if (!selectedMood) return;
   const handleSliderChange = (idx: number) => { setSliderIndex(idx); setSelectedMood(MOODS[idx]); setIntensity(3); };
   const selectMood = (m: any) => { setSelectedMood(m); setIntensity(3); };
   const confirmMood = () => { if (selectedMood) setStep(2); };
@@ -1233,12 +2017,16 @@ export default function Index() {
         @keyframes particle2{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(-60px,80px) scale(0)}}
         @keyframes particle3{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(70px,90px) scale(0)}}
         @keyframes monkeyBob{0%,100%{transform:translateY(0) rotate(0deg)}25%{transform:translateY(-4px) rotate(-3deg)}75%{transform:translateY(-2px) rotate(3deg)}}
+        @keyframes shortRage{0%,100%{transform:translateY(0) rotate(0deg) scale(1)}20%{transform:translateY(-1px) rotate(-2deg) scale(1.02)}40%{transform:translateY(0) rotate(2deg) scale(1.03)}60%{transform:translateY(-2px) rotate(-1deg) scale(1.01)}80%{transform:translateY(0) rotate(1deg) scale(1.02)}}
+        @keyframes shortResolve{0%,100%{transform:translateY(0) rotate(0deg) scale(1)}25%{transform:translateY(-2px) rotate(-1deg) scale(1.01)}50%{transform:translateY(0) rotate(1deg) scale(1.02)}75%{transform:translateY(-1px) rotate(0deg) scale(1.01)}}
         .anim-fadeUp{animation:fadeUp .4s ease-out both}
         .anim-fadeIn{animation:fadeIn .3s ease-out both}
         .anim-slideIn{animation:slideInRight .4s ease-out both}
         .anim-bounce{animation:bounceIn .5s cubic-bezier(.36,1.1,.3,1) both}
         .anim-float{animation:float 3s ease-in-out infinite}
         .anim-monkeyBob{animation:monkeyBob 2s ease-in-out infinite}
+        .anim-shortRage{animation:shortRage 1.05s ease-in-out infinite}
+        .anim-shortResolve{animation:shortResolve 1.45s ease-in-out infinite}
         .anim-d1{animation-delay:.05s}.anim-d2{animation-delay:.1s}.anim-d3{animation-delay:.15s}.anim-d4{animation-delay:.2s}.anim-d5{animation-delay:.25s}.anim-d6{animation-delay:.3s}.anim-d7{animation-delay:.35s}
         .mood-btn{transition:all .25s ease;position:relative;overflow:hidden}
         .mood-btn:hover{transform:scale(1.02);filter:brightness(1.15);box-shadow:0 0 18px rgba(255,122,47,0.25)}
@@ -1263,6 +2051,7 @@ export default function Index() {
         input::placeholder,textarea::placeholder{color:${T.t3}}
       `}</style>
       <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatar} style={{display:"none"}}/>
+      {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)} isPremium={isPremium} onUpgrade={openUpgrade} />}
       {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)}/>}
       {showPaywall && <PaywallOverlay onClose={()=>setShowPaywall(false)} premium={premium} feature={paywallFeature} />}
       {xpPopup && <XpPopup xp={xpPopup.xp} label={xpPopup.label} onDone={() => setXpPopup(null)} />}
@@ -1304,6 +2093,65 @@ export default function Index() {
               )}
             </div>
 
+            {step !== 3 && selectedMood && (
+              <>
+                <InAppNotifications lastCheckinDate={lastCheckinDate} streakCount={streakCount} userName={userName} onNavigate={(t) => { setTab(t); resetFlow(); }} />
+                <div className="anim-fadeUp" style={{marginBottom:16,padding:18,background:`linear-gradient(135deg, ${selectedMood.color}18, transparent)`,borderRadius:22,border:`1px solid ${selectedMood.color}25`}}>
+                  <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
+                    <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" className="tab-monkey" style={{width:68,height:68,objectFit:"contain"}} />
+                    <div>
+                      <div style={{color:T.t1,fontSize:22,fontWeight:900,letterSpacing:-0.5}}>Jak se cítíš?</div>
+                      <div style={{color:T.t2,fontSize:13,marginTop:3}}>Posuň slider a hned dole vyber proč</div>
+                    </div>
+                  </div>
+
+                  <div style={{padding:"16px 14px",background:"rgba(255,255,255,0.03)",border:`1px solid ${selectedMood.color}20`,borderRadius:18,marginBottom:14}}>
+                    {(() => {
+                      const selectedMoodIndex = MOODS.findIndex((m) => m.id === selectedMood.id);
+                      const sliderValue = MOODS.length - 1 - selectedMoodIndex;
+                      return (
+                        <>
+                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+                      <span style={{color:selectedMood.color,fontSize:28,fontWeight:900}}>{selectedMoodIndex + 1}</span>
+                      <div>
+                        <div style={{color:T.t1,fontSize:18,fontWeight:800}}>{selectedMood.label}</div>
+                        <div style={{color:T.t2,fontSize:12}}>{selectedMood.sub}</div>
+                      </div>
+                    </div>
+
+                    <input
+                      type="range"
+                      min={0}
+                      max={MOODS.length - 1}
+                      step={1}
+                      value={sliderValue}
+                      onChange={(e) => selectMood(MOODS[MOODS.length - 1 - Number(e.target.value)])}
+                      style={{width:"100%",accentColor:selectedMood.color,cursor:"pointer"}}
+                    />
+
+                    <div style={{display:"flex",justifyContent:"space-between",marginTop:8,color:T.t3,fontSize:10,fontWeight:700}}>
+                      <span>Na dně</span>
+                      <span>Tak nějak</span>
+                      <span>Skvěle</span>
+                    </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
+                    {[...MOODS].reverse().map((m) => {
+                      const active = m.id === selectedMood.id;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => selectMood(m)}
+                          style={{padding:"8px 0",background:active?`${m.color}18`:T.card,border:`1px solid ${active?m.color:T.border}`,borderRadius:12,color:active?m.color:T.t3,fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+                        >
+                          {m.id === "awful" ? "Dno" : m.label.split("/")[0]}
+                        </button>
+                      );
+                    })}
             {/* STEP 1 — How are you? Good / OK / Bad */}
             {step === 1 && (
               <>
@@ -1399,10 +2247,11 @@ export default function Index() {
                     <div style={{color:T.t2,fontSize:12}}>Co za tím stojí?</div>
                   </div>
                 </div>
+
                 <div style={{color:T.t1,fontSize:18,fontWeight:800,marginBottom:4}}>Proč nebo co cítíš?</div>
-                <div style={{color:T.t2,fontSize:12,marginBottom:16}}>Vyber co je nejblíž — opice najde co ti pomůže</div>
+                <div style={{color:T.t2,fontSize:12,marginBottom:16}}>Jedním klikem vyber, co je tomu nejblíž</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  {REASONS.map(r => (
+                  {REASONS.map((r) => (
                     <button key={r.id} onClick={()=>selectReason(r)} className="reason-card" style={{display:"flex",alignItems:"center",gap:10,padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
                       <img src={REASON_MONKEY[r.id]} alt={r.label} style={{width:40,height:40,objectFit:"contain",borderRadius:8}} loading="lazy" />
                       <div style={{flex:1}}>
@@ -1434,6 +2283,7 @@ export default function Index() {
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Řeč pro tebe</span>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    {recs.speeches.map((s: Speech) => (
                     {(premium.isPremium ? recs.speeches : recs.speeches.slice(0,1)).map((s: any) => (
                       <div key={s.id} className="speech-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
@@ -1473,6 +2323,12 @@ export default function Index() {
                 {/* Heavy metal — use SOS music instead */}
                 {recs.showMetal && (
                   <div style={{marginBottom:20}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                      <img src={monkeyMusic} alt="" style={{width:28,height:28,objectFit:"contain"}} loading="lazy"/>
+                      <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Vypusť páru</span>
+                    </div>
+                    <button onClick={()=>{try{const AudioContextCtor = window.AudioContext || (window as WebkitAudioWindow).webkitAudioContext; if (!AudioContextCtor) return; const c = new AudioContextCtor(); const o = c.createOscillator(); const g = c.createGain(); o.type="sawtooth"; o.frequency.value=82+Math.random()*40; g.gain.value=0.3; o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+4); g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+4);} catch (error) { console.error("Heavy metal fallback failed", error); }}} style={{width:"100%",padding:"16px",background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,color:T.red,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>
+                      🤘 HEAVY METAL — BLAST 🔊
                     <button onClick={()=>setShowSOS(true)} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
                       <img src={monkeyMusic} alt="" style={{width:40,height:40,objectFit:"contain"}} loading="lazy"/>
                       <div>
@@ -1573,10 +2429,30 @@ export default function Index() {
                 <button onClick={()=>{ if (!requirePremium("Opičák AI chat")) setTab("chat"); }} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.teal}12, ${T.blue}08)`,border:`1px solid ${T.teal}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:10}}>
                   <img src={monkeyChat} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
                   <div>
+                    <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Chceš si promluvit? 🐵 {!isPremium && <span style={{color:T.accent,fontSize:11}}>Premium</span>}</div>
+                    <div style={{color:T.t2,fontSize:12}}>{isPremium ? "Opičák ti pomůže — pokecej s ním" : "AI Opičák je v Premium. Check-in a SOS zůstávají free."}</div>
                     <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Chceš si promluvit? {premium.isPremium ? "🐵" : "👑"}</div>
                     <div style={{color:T.t2,fontSize:12}}>{premium.isPremium ? "Opičák ti pomůže — pokecej s ním" : "Premium · Odemkni AI chat"}</div>
                   </div>
                 </button>
+
+                <button onClick={()=>{setProfileSection("library");setTab("profile");}} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.purple}10, ${T.blue}08)`,border:`1px solid ${T.purple}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:10}}>
+                  <img src={monkeyWarrior} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
+                  <div>
+                    <div style={{color:T.t1,fontSize:15,fontWeight:800}}>🎬 Otevři Monkey knihovnu</div>
+                    <div style={{color:T.t2,fontSize:12}}>Speech, Monkey shorts a vybraná motivační videa na jednom místě</div>
+                  </div>
+                </button>
+
+                {!isPremium && (
+                  <button onClick={openUpgrade} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.accent}12, ${T.teal}08)`,border:`1px solid ${T.accent}30`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:20}}>
+                    <img src={monkeyProfile} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
+                    <div>
+                      <div style={{color:T.t1,fontSize:15,fontWeight:800}}>👑 Premium za 799 Kč / rok</div>
+                      <div style={{color:T.t2,fontSize:12}}>Pitch pro rodiče, chat, SOS hudba a silnější obsah navíc</div>
+                    </div>
+                  </button>
+                )}
 
                 {/* Quests CTA */}
                 <button onClick={()=>setTab("quests")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.accent}08, ${T.purple}08)`,border:`1px solid ${T.accent}20`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:20}}>
@@ -1601,6 +2477,7 @@ export default function Index() {
         )}
 
         {/* ════════ CHAT TAB ════════ */}
+        {tab === "chat" && <MonkeyChat isPremium={isPremium} onUpgrade={openUpgrade} initialPrompt={chatSeed} />}
         {tab === "chat" && (premium.isPremium ? <MonkeyChat /> : (
           <div className="anim-fadeUp" style={{textAlign:"center",padding:"40px 16px"}}>
             <img src={monkeyChat} alt="" className="anim-float" style={{width:80,height:80,objectFit:"contain",margin:"0 auto 16px"}} />
@@ -1617,6 +2494,20 @@ export default function Index() {
 
         {/* ════════ PROFILE TAB ════════ */}
         {tab === "profile" && (
+          <ProfileTab
+            moodLog={moodLog}
+            streakCount={streakCount}
+            userName={userName}
+            avatar={avatar}
+            subscriptionTier={subscriptionTier}
+            initialSection={profileSection}
+            onNameChange={handleNameChange}
+            onAvatarClick={()=>fileRef.current?.click()}
+            onSignOut={signOut}
+            onUpgrade={openUpgrade}
+            onOpenChat={openChatWithPrompt}
+            onCopyAsk={copyParentAsk}
+          />
           <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} diaryEntries={cloud.diaryEntries} sosContacts={cloud.sosContacts} onSaveDiary={(content)=>cloud.saveDiaryEntry(content)} onSaveContacts={(contacts)=>cloud.saveSosContacts(contacts)} onCompleteQuest={completeQuest} isPremium={premium.isPremium} onUpgrade={()=>requirePremium("Plný deník & historie")} />
         )}
       </div>
