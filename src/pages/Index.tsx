@@ -1205,11 +1205,6 @@ function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAva
   const [diary, setDiary] = useState("");
   const [diarySaved, setDiarySaved] = useState(false);
   const days = ["Po","Út","St","Čt","Pá","So","Ne"];
-  const isPremium = subscriptionTier === "premium";
-
-  useEffect(() => {
-    if (initialSection) setActiveSection(initialSection);
-  }, [initialSection]);
 
   // Build calendar based on actual dates, not mood log index
   const calendarWeeks: CalendarDay[][] = [];
