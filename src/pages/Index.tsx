@@ -1909,21 +1909,6 @@ export default function Index() {
     setShowOnboarding(false);
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    supabase.rpc("get_today_mood_counts").then(({ data }) => {
-      if (cancelled || !data) return;
-      const counts: Record<string, number> = {};
-      (data as any[]).forEach((r: any) => {
-        counts[r.mood_id] = Number(r.count);
-      });
-      setPeerEcho(counts);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [cloudLoading, moodLog.length]);
-
   const handleNameChange = (n: string) => { cloud.updateName(n); };
   const openUpgrade = () => {
     setTab("profile");
