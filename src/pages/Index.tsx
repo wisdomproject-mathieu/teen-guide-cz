@@ -1526,8 +1526,6 @@ function SOSOverlay({onClose, isPremium, onUpgrade}: {onClose:()=>void; isPremiu
       calm:  { freqs: [220, 277, 330], type: "sine", lfoRate: 0.1, filterFreq: 800 },
       sad:   { freqs: [196, 233, 294], type: "triangle", lfoRate: 0.08, filterFreq: 600 },
       happy: { freqs: [262, 330, 392, 523], type: "sine", lfoRate: 0.2, filterFreq: 2000 },
-      lofi:  { freqs: [196, 247, 294], type: "triangle", lfoRate: 0.12, filterFreq: 950 },
-      rage:  { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
       lofi:  { freqs: [196, 247, 294, 370], type: "triangle", lfoRate: 0.05, filterFreq: 500 },
       rage:  { freqs: [82, 123, 165], type: "sawtooth", lfoRate: 0.5, filterFreq: 1800 },
     };
@@ -2301,14 +2299,12 @@ export default function Index() {
                 <button onClick={()=>{ if (!requirePremium("Opičák AI chat")) setTab("chat"); }} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.teal}12, ${T.blue}08)`,border:`1px solid ${T.teal}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:10}}>
                   <img src={monkeyChat} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
                   <div>
-                    <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Chceš si promluvit? 🐵 {!isPremium && <span style={{color:T.accent,fontSize:11}}>Premium</span>}</div>
-                    <div style={{color:T.t2,fontSize:12}}>{isPremium ? "Opičák ti pomůže — pokecej s ním" : "AI Opičák je v Premium. Check-in a SOS zůstávají free."}</div>
                     <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Chceš si promluvit? {premium.isPremium ? "🐵" : "👑"}</div>
                     <div style={{color:T.t2,fontSize:12}}>{premium.isPremium ? "Opičák ti pomůže — pokecej s ním" : "Premium · Odemkni AI chat"}</div>
                   </div>
                 </button>
 
-                <button onClick={()=>{setProfileSection("library");setTab("profile");}} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.purple}10, ${T.blue}08)`,border:`1px solid ${T.purple}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:10}}>
+                <button onClick={()=>setTab("profile")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.purple}10, ${T.blue}08)`,border:`1px solid ${T.purple}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:10}}>
                   <img src={monkeyWarrior} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
                   <div>
                     <div style={{color:T.t1,fontSize:15,fontWeight:800}}>🎬 Otevři Monkey knihovnu</div>
@@ -2316,8 +2312,8 @@ export default function Index() {
                   </div>
                 </button>
 
-                {!isPremium && (
-                  <button onClick={openUpgrade} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.accent}12, ${T.teal}08)`,border:`1px solid ${T.accent}30`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:20}}>
+                {!premium.isPremium && (
+                  <button onClick={()=>requirePremium("Premium")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.accent}12, ${T.teal}08)`,border:`1px solid ${T.accent}30`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:20}}>
                     <img src={monkeyProfile} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
                     <div>
                       <div style={{color:T.t1,fontSize:15,fontWeight:800}}>👑 Premium za 799 Kč / rok</div>
