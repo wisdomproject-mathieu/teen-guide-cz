@@ -1199,35 +1199,6 @@ function MoodInsightsCharts({ moodLog }: { moodLog: MoodLogEntry[] }) {
 }
 
 // ── PROFILE TAB (with Mood Insights) ──
-function ProfileTab({
-  moodLog,
-  streakCount,
-  userName,
-  avatar,
-  subscriptionTier,
-  initialSection,
-  onNameChange,
-  onAvatarClick,
-  onSignOut,
-  onUpgrade,
-  onOpenChat,
-  onCopyAsk,
-}: {
-  moodLog: MoodLogEntry[];
-  streakCount: number;
-  userName: string;
-  avatar: string | null;
-  subscriptionTier: SubscriptionTier;
-  initialSection?: "overview" | "premium" | "library" | "insights" | "contacts" | "diary" | "calendar";
-  onNameChange: (n: string) => void;
-  onAvatarClick: () => void;
-  onSignOut: () => void;
-  onUpgrade: () => void;
-  onOpenChat: (prompt: string) => void;
-  onCopyAsk: () => void;
-}) {
-  const [activeSection, setActiveSection] = useState(initialSection || "overview");
-  const [contacts, setContacts] = useState([{name:"",phone:""}]);
 function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut, diaryEntries, sosContacts, onSaveDiary, onSaveContacts, onCompleteQuest, isPremium, onUpgrade}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void; diaryEntries:any[]; sosContacts:{id?:string;name:string;phone:string}[]; onSaveDiary:(content:string)=>void; onSaveContacts:(contacts:{id?:string;name:string;phone:string}[])=>void; onCompleteQuest:(id:string)=>void; isPremium:boolean; onUpgrade:()=>void}) {
   const [activeSection, setActiveSection] = useState("overview");
   const [contacts, setContacts] = useState<{id?:string;name:string;phone:string}[]>(sosContacts.length > 0 ? sosContacts : [{name:"",phone:""}]);
