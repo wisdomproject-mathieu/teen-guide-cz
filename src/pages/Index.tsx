@@ -2086,65 +2086,6 @@ export default function Index() {
               )}
             </div>
 
-            {step !== 3 && selectedMood && (
-              <>
-                <InAppNotifications lastCheckinDate={lastCheckinDate} streakCount={streakCount} userName={userName} onNavigate={(t) => { setTab(t); resetFlow(); }} />
-                <div className="anim-fadeUp" style={{marginBottom:16,padding:18,background:`linear-gradient(135deg, ${selectedMood.color}18, transparent)`,borderRadius:22,border:`1px solid ${selectedMood.color}25`}}>
-                  <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
-                    <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" className="tab-monkey" style={{width:68,height:68,objectFit:"contain"}} />
-                    <div>
-                      <div style={{color:T.t1,fontSize:22,fontWeight:900,letterSpacing:-0.5}}>Jak se cítíš?</div>
-                      <div style={{color:T.t2,fontSize:13,marginTop:3}}>Posuň slider a hned dole vyber proč</div>
-                    </div>
-                  </div>
-
-                  <div style={{padding:"16px 14px",background:"rgba(255,255,255,0.03)",border:`1px solid ${selectedMood.color}20`,borderRadius:18,marginBottom:14}}>
-                    {(() => {
-                      const selectedMoodIndex = MOODS.findIndex((m) => m.id === selectedMood.id);
-                      const sliderValue = MOODS.length - 1 - selectedMoodIndex;
-                      return (
-                        <>
-                    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
-                      <span style={{color:selectedMood.color,fontSize:28,fontWeight:900}}>{selectedMoodIndex + 1}</span>
-                      <div>
-                        <div style={{color:T.t1,fontSize:18,fontWeight:800}}>{selectedMood.label}</div>
-                        <div style={{color:T.t2,fontSize:12}}>{selectedMood.sub}</div>
-                      </div>
-                    </div>
-
-                    <input
-                      type="range"
-                      min={0}
-                      max={MOODS.length - 1}
-                      step={1}
-                      value={sliderValue}
-                      onChange={(e) => selectMood(MOODS[MOODS.length - 1 - Number(e.target.value)])}
-                      style={{width:"100%",accentColor:selectedMood.color,cursor:"pointer"}}
-                    />
-
-                    <div style={{display:"flex",justifyContent:"space-between",marginTop:8,color:T.t3,fontSize:10,fontWeight:700}}>
-                      <span>Na dně</span>
-                      <span>Tak nějak</span>
-                      <span>Skvěle</span>
-                    </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
-                    {[...MOODS].reverse().map((m) => {
-                      const active = m.id === selectedMood.id;
-                      return (
-                        <button
-                          key={m.id}
-                          onClick={() => selectMood(m)}
-                          style={{padding:"8px 0",background:active?`${m.color}18`:T.card,border:`1px solid ${active?m.color:T.border}`,borderRadius:12,color:active?m.color:T.t3,fontSize:11,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
-                        >
-                          {m.id === "awful" ? "Dno" : m.label.split("/")[0]}
-                        </button>
-                      );
-                    })}
             {/* STEP 1 — How are you? Good / OK / Bad */}
             {step === 1 && (
               <>
