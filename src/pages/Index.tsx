@@ -1234,11 +1234,11 @@ function ProfileTab({
   onNameChange,
   onAvatarClick,
   onSignOut,
-  diaryEntries,
-  sosContacts,
-  onSaveDiary,
-  onSaveContacts,
-  onCompleteQuest,
+  diaryEntries = [],
+  sosContacts = [],
+  onSaveDiary = () => {},
+  onSaveContacts = () => {},
+  onCompleteQuest = () => {},
   onUpgrade,
   onOpenChat,
   onCopyAsk,
@@ -1252,11 +1252,11 @@ function ProfileTab({
   onNameChange: (n: string) => void;
   onAvatarClick: () => void;
   onSignOut: () => void;
-  diaryEntries: any[];
-  sosContacts: { id?: string; name: string; phone: string }[];
-  onSaveDiary: (content: string) => void;
-  onSaveContacts: (contacts: { id?: string; name: string; phone: string }[]) => void;
-  onCompleteQuest: (id: string) => void;
+  diaryEntries?: any[];
+  sosContacts?: { id?: string; name: string; phone: string }[];
+  onSaveDiary?: (content: string) => void;
+  onSaveContacts?: (contacts: { id?: string; name: string; phone: string }[]) => void;
+  onCompleteQuest?: (id: string) => void;
   onUpgrade: () => void;
   onOpenChat: (prompt: string) => void;
   onCopyAsk: () => void;
@@ -2470,6 +2470,11 @@ export default function Index() {
             onNameChange={handleNameChange}
             onAvatarClick={()=>fileRef.current?.click()}
             onSignOut={signOut}
+            diaryEntries={cloud.diaryEntries}
+            sosContacts={cloud.sosContacts}
+            onSaveDiary={(content) => cloud.saveDiaryEntry(content)}
+            onSaveContacts={(contacts) => cloud.saveSosContacts(contacts)}
+            onCompleteQuest={completeQuest}
             onUpgrade={openUpgrade}
             onOpenChat={openChatWithPrompt}
             onCopyAsk={copyParentAsk}
