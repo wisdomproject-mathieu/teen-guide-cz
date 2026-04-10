@@ -5,16 +5,70 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Tone-aware voice settings per emotion
-const VOICE_SETTINGS: Record<string, { stability: number; style: number; speed: number }> = {
-  anger:   { stability: 0.28, style: 0.82, speed: 1.14 },
-  sadness: { stability: 0.44, style: 0.62, speed: 1.0 },
-  anxiety: { stability: 0.48, style: 0.58, speed: 1.02 },
-  fear:    { stability: 0.4, style: 0.68, speed: 1.04 },
-  lonely:  { stability: 0.42, style: 0.64, speed: 1.0 },
-  overwhelm: { stability: 0.4, style: 0.66, speed: 1.03 },
-  all:     { stability: 0.36, style: 0.74, speed: 1.08 },
+type VoiceSettings = {
+  stability: number;
+  style: number;
+  speed: number;
+  similarity_boost: number;
 };
+
+// More energetic baseline for direct-address motivational delivery.
+const VOICE_SETTINGS: Record<string, VoiceSettings> = {
+  anger:      { stability: 0.16, style: 0.96, speed: 1.18, similarity_boost: 0.86 },
+  sadness:    { stability: 0.28, style: 0.82, speed: 1.04, similarity_boost: 0.84 },
+  anxiety:    { stability: 0.24, style: 0.88, speed: 1.09, similarity_boost: 0.85 },
+  fear:       { stability: 0.24, style: 0.9, speed: 1.08, similarity_boost: 0.85 },
+  lonely:     { stability: 0.3, style: 0.8, speed: 1.03, similarity_boost: 0.84 },
+  overwhelm:  { stability: 0.26, style: 0.84, speed: 1.06, similarity_boost: 0.84 },
+  positive:   { stability: 0.18, style: 0.94, speed: 1.15, similarity_boost: 0.86 },
+  all:        { stability: 0.2, style: 0.92, speed: 1.13, similarity_boost: 0.86 },
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function tuneVoiceSettings(emotion: string, text: string): VoiceSettings {
+  const base = VOICE_SETTINGS[emotion] || VOICE_SETTINGS.all;
+  const length = text.length;
+  const exclamations = (text.match(/!/g) || []).length;
+  const questions = (text.match(/\?/g) || []).length;
+  const shortPunch = length < 140;
+  const longSupport = length > 240;
+
+  let stability = base.stability;
+  let style = base.style;
+  let speed = base.speed;
+  const similarity_boost = base.similarity_boost;
+
+  if (shortPunch) {
+    stability -= 0.04;
+    style += 0.05;
+    speed += 0.03;
+  }
+
+  if (longSupport) {
+    stability += 0.05;
+    style -= 0.04;
+    speed -= 0.04;
+  }
+
+  if (exclamations > 0) {
+    style += 0.04;
+    speed += 0.02;
+  }
+
+  if (questions > 1) {
+    stability += 0.02;
+  }
+
+  return {
+    stability: clamp(stability, 0.12, 0.62),
+    style: clamp(style, 0.55, 1),
+    speed: clamp(speed, 0.96, 1.2),
+    similarity_boost: clamp(similarity_boost, 0.78, 0.9),
+  };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -41,13 +95,14 @@ serve(async (req) => {
 
     // Use Daniel voice - good for Czech/multilingual content
     const voiceId = "onwK4e9ZLuTAKqWW03F9";
-    const baseSettings = VOICE_SETTINGS[emotion] || VOICE_SETTINGS.all;
+    const baseSettings = tuneVoiceSettings(emotion, text);
     // Intensity modulation (1-5 scale): higher intensity = less stability, more style, faster
-    const intensityFactor = typeof intensity === "number" ? Math.max(1, Math.min(5, intensity)) : 3;
+    const intensityFactor = typeof intensity === "number" ? clamp(intensity, 1, 5) : 3;
     const settings = {
-      stability: Math.max(0.1, baseSettings.stability - (intensityFactor - 3) * 0.1),
-      style: Math.min(1, baseSettings.style + (intensityFactor - 3) * 0.08),
-      speed: Math.min(1.3, baseSettings.speed + (intensityFactor - 3) * 0.05),
+      stability: clamp(baseSettings.stability - (intensityFactor - 3) * 0.08, 0.1, 0.62),
+      style: clamp(baseSettings.style + (intensityFactor - 3) * 0.05, 0.55, 1),
+      speed: clamp(baseSettings.speed + (intensityFactor - 3) * 0.03, 0.96, 1.22),
+      similarity_boost: baseSettings.similarity_boost,
     };
 
     const response = await fetch(
@@ -63,7 +118,7 @@ serve(async (req) => {
           model_id: "eleven_multilingual_v2",
           voice_settings: {
             stability: settings.stability,
-            similarity_boost: 0.82,
+            similarity_boost: settings.similarity_boost,
             style: settings.style,
             use_speaker_boost: true,
             speed: settings.speed,
@@ -82,17 +137,15 @@ serve(async (req) => {
         upstreamMessage = "";
       }
       console.error("ElevenLabs error:", response.status, errText);
-      return new Response(JSON.stringify({
-        error: upstreamMessage.toLowerCase().includes("invalid api key") ? "Neplatný ELEVENLABS_API_KEY" : "TTS generation failed",
-        details: upstreamMessage || errText,
-      }), {
-        status: response.status,
-      // For auth/billing errors (401/402), signal client to use browser fallback
       const isRecoverable = response.status === 401 || response.status === 402 || response.status >= 500;
-      return new Response(JSON.stringify({ 
-        error: isRecoverable ? "SERVICE_UNAVAILABLE" : "TTS generation failed", 
+      return new Response(JSON.stringify({
+        error: upstreamMessage.toLowerCase().includes("invalid api key")
+          ? "Neplatný ELEVENLABS_API_KEY"
+          : isRecoverable
+            ? "SERVICE_UNAVAILABLE"
+            : "TTS generation failed",
         fallback: isRecoverable,
-        details: errText 
+        details: upstreamMessage || errText,
       }), {
         status: 200, // Return 200 so client can read the JSON body
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -377,6 +377,13 @@ function MonkeyShortPlayer({
   const shortVisual = getShortVisual(item);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timersRef = useRef<number[]>([]);
+  const [captionPulseKey, setCaptionPulseKey] = useState(0);
+
+  const sceneDurations = useMemo(() => {
+    const wordCounts = lines.map((line) => Math.max(1, line.trim().split(/\s+/).length));
+    const totalWords = wordCounts.reduce((sum, count) => sum + count, 0);
+    return wordCounts.map((count) => (count / totalWords) * item.durationSeconds);
+  }, [item.durationSeconds, lines]);
 
   const clearCaptionTimers = useCallback(() => {
     timersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -386,13 +393,17 @@ function MonkeyShortPlayer({
   const runCaptionSequence = useCallback((totalMs: number) => {
     clearCaptionTimers();
     setLineIndex(0);
+    setCaptionPulseKey((current) => current + 1);
     if (lines.length <= 1) return;
     const wordCounts = lines.map((line) => Math.max(1, line.trim().split(/\s+/).length));
     const totalWords = wordCounts.reduce((sum, count) => sum + count, 0);
     let elapsed = 0;
     for (let i = 1; i < lines.length; i += 1) {
       elapsed += (wordCounts[i - 1] / totalWords) * totalMs;
-      const timer = window.setTimeout(() => setLineIndex(i), elapsed);
+      const timer = window.setTimeout(() => {
+        setLineIndex(i);
+        setCaptionPulseKey((current) => current + 1);
+      }, elapsed);
       timersRef.current.push(timer);
     }
   }, [clearCaptionTimers, lines]);
@@ -422,6 +433,13 @@ function MonkeyShortPlayer({
   const progress = ((lineIndex + 1) / lines.length) * 100;
   const fullText = item.text || lines.join(" ");
   const shareText = `${item.title}\n\n${lines[lineIndex]}\n\nMonkey Mind`;
+  const nextLine = lines[lineIndex + 1] ?? null;
+  const captionDuration = Math.max(2, Math.round(sceneDurations[lineIndex] || item.durationSeconds / lines.length));
+  const shortMotionClass = voicePlaying
+    ? `${shortVisual.motionClass} anim-shortTalking`
+    : playing
+      ? `${shortVisual.motionClass} anim-shortLive`
+      : shortVisual.motionClass;
 
   const playVoice = async () => {
     if (voicePlaying && audioRef.current) {
@@ -432,6 +450,7 @@ function MonkeyShortPlayer({
       setVoiceLoading(false);
       clearCaptionTimers();
       setLineIndex(0);
+      setCaptionPulseKey((current) => current + 1);
       setPlaying(false);
       return;
     }
@@ -467,6 +486,7 @@ function MonkeyShortPlayer({
         setVoiceError("Prémiový hlas teď není dostupný.");
       };
       setLineIndex(0);
+      setCaptionPulseKey((current) => current + 1);
       setPlaying(true);
       runCaptionSequence(item.durationSeconds * 1000);
       await audio.play();
@@ -518,23 +538,42 @@ function MonkeyShortPlayer({
             ))}
           </div>
 
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-            <div style={{width:128,height:18,borderRadius:"50%",background:`radial-gradient(circle, ${shortVisual.glow}55 0%, rgba(255,255,255,0.08) 45%, transparent 72%)`,filter:"blur(4px)",opacity:0.85}} />
-            <img src={shortVisual.image} alt="" className={shortVisual.motionClass} style={{width:160,height:160,objectFit:"contain",filter:`drop-shadow(0 0 28px ${shortVisual.glow}70)`}} />
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
+            <div className={playing || voicePlaying ? "anim-groundPulse" : undefined} style={{width:136,height:20,borderRadius:"50%",background:`radial-gradient(circle, ${shortVisual.glow}55 0%, rgba(255,255,255,0.08) 45%, transparent 72%)`,filter:"blur(5px)",opacity:0.88}} />
+            <img src={shortVisual.image} alt="" className={shortMotionClass} style={{width:168,height:168,objectFit:"contain",filter:`drop-shadow(0 0 28px ${shortVisual.glow}70)`}} />
           </div>
 
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,width:"100%"}}>
-            <div style={{color:T.t3,fontSize:11,fontWeight:700,letterSpacing:0.35}}>SCÉNA {lineIndex + 1} / {lines.length}</div>
-            <div style={{color:T.t1,fontSize:26,fontWeight:900,lineHeight:1.15,textAlign:"center",maxWidth:280,letterSpacing:-0.4}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{color:T.t3,fontSize:11,fontWeight:700,letterSpacing:0.35}}>SCÉNA {lineIndex + 1} / {lines.length}</div>
+              <div style={{padding:"4px 8px",borderRadius:99,background:"rgba(255,255,255,0.05)",border:`1px solid ${T.border}`,color:T.t3,fontSize:10,fontWeight:800,letterSpacing:0.3}}>
+                {captionDuration}s
+              </div>
+            </div>
+            <div key={`${lineIndex}-${captionPulseKey}`} className="anim-captionCue" style={{color:T.t1,fontSize:28,fontWeight:900,lineHeight:1.12,textAlign:"center",maxWidth:290,letterSpacing:-0.5,textShadow:`0 0 22px ${shortVisual.glow}22`}}>
               {lines[lineIndex]}
             </div>
+            {nextLine && (
+              <div style={{color:T.t3,fontSize:13,fontWeight:700,letterSpacing:0.2,textAlign:"center",maxWidth:260,opacity:0.8}}>
+                pak: {nextLine}
+              </div>
+            )}
             <div style={{color:T.t2,fontSize:12,lineHeight:1.55,textAlign:"center",maxWidth:300}}>
               {item.hook}
             </div>
           </div>
 
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,width:"100%",marginTop:10}}>
-            <button onClick={() => setPlaying((prev) => !prev)} style={{flex:1,padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+            <button onClick={() => {
+              setPlaying((prev) => {
+                const next = !prev;
+                if (!prev && lineIndex >= lines.length - 1) {
+                  setLineIndex(0);
+                  setCaptionPulseKey((current) => current + 1);
+                }
+                return next;
+              });
+            }} style={{flex:1,padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
               {playing ? "⏸ Pauza textu" : lineIndex > 0 ? "▶ Pokračovat v textu" : "▶ Spustit text"}
             </button>
             <button onClick={playVoice} style={{flex:1,padding:"11px 14px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
@@ -2017,8 +2056,12 @@ export default function Index() {
         @keyframes particle2{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(-60px,80px) scale(0)}}
         @keyframes particle3{0%{opacity:1;transform:translate(0,0)}100%{opacity:0;transform:translate(70px,90px) scale(0)}}
         @keyframes monkeyBob{0%,100%{transform:translateY(0) rotate(0deg)}25%{transform:translateY(-4px) rotate(-3deg)}75%{transform:translateY(-2px) rotate(3deg)}}
-        @keyframes shortRage{0%,100%{transform:translateY(0) rotate(0deg) scale(1)}20%{transform:translateY(-1px) rotate(-2deg) scale(1.02)}40%{transform:translateY(0) rotate(2deg) scale(1.03)}60%{transform:translateY(-2px) rotate(-1deg) scale(1.01)}80%{transform:translateY(0) rotate(1deg) scale(1.02)}}
-        @keyframes shortResolve{0%,100%{transform:translateY(0) rotate(0deg) scale(1)}25%{transform:translateY(-2px) rotate(-1deg) scale(1.01)}50%{transform:translateY(0) rotate(1deg) scale(1.02)}75%{transform:translateY(-1px) rotate(0deg) scale(1.01)}}
+        @keyframes shortRage{0%,100%{transform:translate3d(0,0,0) rotate(0deg) scale(1)}18%{transform:translate3d(-3px,-4px,0) rotate(-3deg) scale(1.03)}36%{transform:translate3d(2px,0,0) rotate(2.2deg) scale(1.04)}54%{transform:translate3d(-2px,-5px,0) rotate(-1.4deg) scale(1.02)}72%{transform:translate3d(3px,-1px,0) rotate(1.5deg) scale(1.03)}}
+        @keyframes shortResolve{0%,100%{transform:translate3d(0,0,0) rotate(0deg) scale(1)}25%{transform:translate3d(0,-5px,0) rotate(-1deg) scale(1.015)}50%{transform:translate3d(1px,-2px,0) rotate(1deg) scale(1.025)}75%{transform:translate3d(-1px,-4px,0) rotate(0deg) scale(1.015)}}
+        @keyframes shortTalking{0%,100%{filter:drop-shadow(0 0 20px rgba(255,255,255,0.04)) drop-shadow(0 0 28px rgba(255,122,47,0.28))}35%{filter:drop-shadow(0 0 28px rgba(255,255,255,0.08)) drop-shadow(0 0 36px rgba(255,122,47,0.44))}70%{filter:drop-shadow(0 0 22px rgba(255,255,255,0.06)) drop-shadow(0 0 34px rgba(255,122,47,0.38))}}
+        @keyframes shortLive{0%,100%{transform:scale(1)}50%{transform:scale(1.015)}}
+        @keyframes groundPulse{0%,100%{transform:scaleX(1) scaleY(1);opacity:.82}50%{transform:scaleX(1.08) scaleY(.86);opacity:1}}
+        @keyframes captionCue{0%{opacity:0;transform:translateY(10px) scale(.97)}100%{opacity:1;transform:translateY(0) scale(1)}}
         .anim-fadeUp{animation:fadeUp .4s ease-out both}
         .anim-fadeIn{animation:fadeIn .3s ease-out both}
         .anim-slideIn{animation:slideInRight .4s ease-out both}
@@ -2027,6 +2070,10 @@ export default function Index() {
         .anim-monkeyBob{animation:monkeyBob 2s ease-in-out infinite}
         .anim-shortRage{animation:shortRage 1.05s ease-in-out infinite}
         .anim-shortResolve{animation:shortResolve 1.45s ease-in-out infinite}
+        .anim-shortTalking{animation:shortTalking .9s ease-in-out infinite}
+        .anim-shortLive{animation:shortLive .9s ease-in-out infinite}
+        .anim-groundPulse{animation:groundPulse 1.05s ease-in-out infinite}
+        .anim-captionCue{animation:captionCue .32s cubic-bezier(.2,.8,.2,1) both}
         .anim-d1{animation-delay:.05s}.anim-d2{animation-delay:.1s}.anim-d3{animation-delay:.15s}.anim-d4{animation-delay:.2s}.anim-d5{animation-delay:.25s}.anim-d6{animation-delay:.3s}.anim-d7{animation-delay:.35s}
         .mood-btn{transition:all .25s ease;position:relative;overflow:hidden}
         .mood-btn:hover{transform:scale(1.02);filter:brightness(1.15);box-shadow:0 0 18px rgba(255,122,47,0.25)}

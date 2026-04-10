@@ -170,3 +170,8 @@ Never:
 If the content should feel like it belongs to Monkey Mind, create it originally.
 
 If the content should stay clearly attached to the original creator, embed it officially.
+
+## Related docs
+
+For the current owned-content system, speech inventory, and mood/reason/level mapping, use:
+- [Monkey Mind Content System](./monkey-mind-content-system.md)
