@@ -1,8 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useCloudData } from "@/hooks/useCloudData";
+import { usePremium } from "@/hooks/usePremium";
 import Onboarding from "@/components/Onboarding";
 import InAppNotifications from "@/components/InAppNotifications";
+import PaywallOverlay from "@/components/PaywallOverlay";
 import { useAuth } from "@/hooks/useAuth";
 import { getRecommendations } from "@/data/speeches";
 import type { Speech } from "@/data/speeches";
@@ -59,14 +63,15 @@ const T={bg:"#0A0C13",accent:"#FF7A2F",accentDim:"rgba(255,122,47,0.12)",teal:"#
 
 // Speeches are in src/data/speeches.ts
 
+// Ordered from worst → best for slider (index 0 = left/worst, 6 = right/best)
 const MOODS=[
-  {id:"great",label:"Skvěle",sub:"Mám energii, svět je můj",color:T.teal},
-  {id:"pumped",label:"Nabitej/á",sub:"Ready na cokoliv",color:T.blue},
-  {id:"meh",label:"Tak nějak",sub:"Nic moc, nic málo",color:T.accent},
-  {id:"angry",label:"Naštvanej/á",sub:"Všechno mě sere",color:T.red},
-  {id:"sad",label:"Smutnej/á",sub:"Bolí to uvnitř",color:T.purple},
-  {id:"anxious",label:"Úzkostnej/á",sub:"Svírá mě to",color:"#FF7A2F"},
-  {id:"awful",label:"Na dně",sub:"Nevím co dál",color:T.red},
+  {id:"awful",label:"Na dně",sub:"Nevím co dál",color:T.red,emoji:"💀"},
+  {id:"anxious",label:"Úzkostnej/á",sub:"Svírá mě to",color:"#FF7A2F",emoji:"😰"},
+  {id:"sad",label:"Smutnej/á",sub:"Bolí to uvnitř",color:T.purple,emoji:"😢"},
+  {id:"angry",label:"Naštvanej/á",sub:"Všechno mě sere",color:T.red,emoji:"😡"},
+  {id:"meh",label:"Tak nějak",sub:"Nic moc, nic málo",color:T.accent,emoji:"😐"},
+  {id:"pumped",label:"Nabitej/á",sub:"Ready na cokoliv",color:T.blue,emoji:"💪"},
+  {id:"great",label:"Skvěle",sub:"Mám energii, svět je můj",color:T.teal,emoji:"🔥"},
 ];
 
 const REASON_MONKEY: Record<string, string> = {
@@ -86,6 +91,14 @@ const REASONS=[
 ];
 
 const audioCache = new Map<string, string>();
+const MAX_CACHE = 20;
+function setCachedAudio(key: string, url: string) {
+  if (audioCache.size >= MAX_CACHE) {
+    const firstKey = audioCache.keys().next().value;
+    if (firstKey) { URL.revokeObjectURL(audioCache.get(firstKey)!); audioCache.delete(firstKey); }
+  }
+  audioCache.set(key, url);
+}
 
 type MoodOption = typeof MOODS[number];
 type ReasonOption = typeof REASONS[number];
@@ -104,7 +117,7 @@ type AudioNodeWithStop = AudioNode & { stop?: () => void };
 type WebkitAudioWindow = Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext };
 
 // ── SPEECH PLAYER ──
-function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: string; speechId: string; emotion: string}) {
+function SpeechPlayer({text, label, speechId, emotion, intensity, onComplete}: {text: string; label: string; speechId: string; emotion: string; intensity?: number; onComplete?:()=>void}) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
@@ -137,13 +150,16 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
   const play = async () => {
     if (playing) { stopPlayback(); return; }
     let audioUrl = audioCache.get(speechId);
+    if (playing) { audioRef.current?.pause(); setPlaying(false); return; }
+    const cacheKey = `${speechId}-i${intensity||3}`;
+    let audioUrl = audioCache.get(cacheKey);
     if (!audioUrl) {
       setLoading(true);
       setError(null);
       try {
         const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
           method: "POST", headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-          body: JSON.stringify({ text, emotion }),
+          body: JSON.stringify({ text, emotion, intensity: intensity || 3 }),
         });
         if (!response.ok) {
           const detail = await extractResponseError(response);
@@ -154,6 +170,12 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
           const detail = await extractResponseError(response.clone());
           throw new Error(detail || `Unexpected content type: ${contentType}`);
         }
+        const contentType = response.headers.get("Content-Type") || "";
+        if (contentType.includes("application/json")) {
+          const data = await response.json();
+          if (data.fallback || data.error) throw new Error(data.error || "TTS unavailable");
+        }
+        if (!response.ok) throw new Error(`TTS failed`);
         const audioBlob = await response.blob();
         if (audioBlob.size < 1000) throw new Error("Empty audio");
         audioUrl = URL.createObjectURL(audioBlob);
@@ -161,6 +183,8 @@ function SpeechPlayer({text, label, speechId, emotion}: {text: string; label: st
         setUsingFallback(false);
       } catch (err) {
         console.error("Speech playback failed", err);
+        setCachedAudio(cacheKey, audioUrl);
+      } catch {
         setLoading(false);
         setUsingFallback(true);
         const message = err instanceof Error ? err.message : "Prémiový hlas se teď nenačetl. Zkus to prosím znovu.";
@@ -655,6 +679,8 @@ function ContentLibrary({
   const [activeShortId, setActiveShortId] = useState<string | null>(null);
   const toggleShort = (item: ContentItem) => {
     setActiveShortId((current) => current === item.id ? null : item.id);
+    audio.onended = () => { setPlaying(false); onComplete?.(); }; audio.onerror = () => setPlaying(false);
+    setPlaying(true); audio.play();
   };
 
   return (
@@ -690,8 +716,9 @@ function ContentLibrary({
 }
 
 // ── BREATHING ──
-function BreathingExercise({type="box"}: {type?: string}) {
+function BreathingExercise({type="box", onComplete}: {type?: string; onComplete?:()=>void}) {
   const [active, setActive] = useState(false);
+  const [completed, setCompleted] = useState(false);
   const [phase, setPhase] = useState("ready");
   const [count, setCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -702,10 +729,11 @@ function BreathingExercise({type="box"}: {type?: string}) {
   };
   const pat = patterns[type] || patterns.box;
   const stop = useCallback(() => {clearInterval(timerRef.current);setActive(false);setPhase("ready");setCount(0);phaseRef.current=0}, []);
+  const cyclesRef = useRef(0);
   const start = () => {
-    if(active){stop();return} setActive(true);phaseRef.current=0;
+    if(active){stop();return} setActive(true);phaseRef.current=0;cyclesRef.current=0;
     const p=pat.phases[0];setPhase(p.label);setCount(p.dur);let c=p.dur;
-    timerRef.current=setInterval(()=>{c--;if(c<=0){phaseRef.current=(phaseRef.current+1)%pat.phases.length;const np=pat.phases[phaseRef.current];setPhase(np.label);c=np.dur;setCount(np.dur)}else setCount(c)},1000);
+    timerRef.current=setInterval(()=>{c--;if(c<=0){phaseRef.current=(phaseRef.current+1)%pat.phases.length;if(phaseRef.current===0){cyclesRef.current++;if(cyclesRef.current>=3&&!completed){setCompleted(true);onComplete?.()}}const np=pat.phases[phaseRef.current];setPhase(np.label);c=np.dur;setCount(np.dur)}else setCount(c)},1000);
   };
   useEffect(()=>()=>clearInterval(timerRef.current),[]);
   const cp = active ? pat.phases[phaseRef.current] : null;
@@ -738,29 +766,41 @@ const DAILY_QUESTS = [
   { id: "streak7", label: "7denní streak", desc: "Přijď 7 dní v řadě", xp: 75, icon: "⚡" },
 ];
 
+// ── WARRIOR RANKS ──
+const WARRIOR_RANKS = [
+  { id: "novacek", name: "Opičí nováček 🐒", minXp: 0, color: T.t2, desc: "Každá legenda začala tady" },
+  { id: "bojovnik", name: "Opičí bojovník ⚔️", minXp: 100, color: T.accent, desc: "Ukazuješ sílu" },
+  { id: "valecnik", name: "Opičí válečník 🛡️", minXp: 300, color: T.teal, desc: "Nic tě nezastaví" },
+  { id: "legenda", name: "Opičí legenda 👑", minXp: 750, color: "#FFD700", desc: "Jsi inspirace" },
+];
+function getWarriorRank(xp: number) {
+  return [...WARRIOR_RANKS].reverse().find(r => xp >= r.minXp) || WARRIOR_RANKS[0];
+}
+
 function QuestsTab({ xp, completedQuests, onEquipSkin, equippedSkin }: { xp: number; completedQuests: string[]; onEquipSkin: (id: string) => void; equippedSkin: string }) {
   const [view, setView] = useState<"quests" | "skins">("quests");
   const todayKey = new Date().toISOString().split("T")[0];
   const todayCompleted = completedQuests.filter(q => q.startsWith(todayKey)).map(q => q.split(":")[1]);
 
-  const currentLevel = Math.floor(xp / 100) + 1;
-  const xpInLevel = xp % 100;
+  const rank = getWarriorRank(xp);
+  const nextRank = WARRIOR_RANKS.find(r => r.minXp > xp);
   const nextSkin = MONKEY_SKINS.find(s => s.xpNeeded > xp);
+  const rankProgress = nextRank ? ((xp - rank.minXp) / (nextRank.minXp - rank.minXp)) * 100 : 100;
 
   return (
     <div style={{ paddingTop: 8 }} className="anim-fadeUp">
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, padding: 16, background: `linear-gradient(135deg, ${T.accent}15, ${T.purple}08)`, borderRadius: 20, border: `1px solid ${T.accent}20` }}>
+      {/* Header — Warrior Rank */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, padding: 16, background: `linear-gradient(135deg, ${rank.color}15, ${T.purple}08)`, borderRadius: 20, border: `1px solid ${rank.color}20` }}>
         <img src={monkeyQuests} alt="" className="anim-monkeyBob" style={{ width: 64, height: 64, objectFit: "contain" }} />
         <div style={{ flex: 1 }}>
-          <div style={{ color: T.t1, fontSize: 20, fontWeight: 900 }}>Level {currentLevel} 🐵</div>
+          <div style={{ color: rank.color, fontSize: 18, fontWeight: 900 }}>{rank.name}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
             <div style={{ flex: 1, height: 8, background: T.card, borderRadius: 99, border: `1px solid ${T.border}`, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${xpInLevel}%`, background: `linear-gradient(90deg, ${T.accent}, ${T.teal})`, borderRadius: 99, transition: "width .5s ease" }} />
+              <div style={{ height: "100%", width: `${rankProgress}%`, background: `linear-gradient(90deg, ${rank.color}, ${nextRank?.color || "#FFD700"})`, borderRadius: 99, transition: "width .5s ease" }} />
             </div>
-            <span style={{ color: T.accent, fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{xp} XP</span>
+            <span style={{ color: rank.color, fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{xp} XP</span>
           </div>
-          {nextSkin && <div style={{ color: T.t3, fontSize: 11, marginTop: 4 }}>Další skin: {nextSkin.name} za {nextSkin.xpNeeded} XP</div>}
+          {nextRank && <div style={{ color: T.t3, fontSize: 11, marginTop: 4 }}>Další rank: {nextRank.name} za {nextRank.minXp} XP</div>}
         </div>
       </div>
 
@@ -1045,7 +1085,7 @@ function MoodInsightsCharts({ moodLog }: { moodLog: MoodLogEntry[] }) {
   // Mood distribution pie data
   const counts: Record<string, number> = {};
   const filteredLogs = range === "week"
-    ? moodLog.filter(l => { const d = new Date(); d.setDate(d.getDate() - 7); return new Date(l.ts.replace(/(\d+)\.\s*(\d+)\.\s*(\d+)/, '$3-$2-$1')) >= d || true; })
+    ? moodLog.filter(l => { const d = new Date(); d.setDate(d.getDate() - 7); return new Date(l.ts.replace(/(\d+)\.\s*(\d+)\.\s*(\d+)/, '$3-$2-$1')) >= d; })
     : moodLog;
   filteredLogs.forEach((l) => { counts[l.mood.id] = (counts[l.mood.id] || 0) + 1; });
   const pieData = Object.entries(counts)
@@ -1190,7 +1230,11 @@ function ProfileTab({
 }) {
   const [activeSection, setActiveSection] = useState(initialSection || "overview");
   const [contacts, setContacts] = useState([{name:"",phone:""}]);
+function ProfileTab({moodLog, streakCount, userName, avatar, onNameChange, onAvatarClick, onSignOut, diaryEntries, sosContacts, onSaveDiary, onSaveContacts, onCompleteQuest, isPremium, onUpgrade}: {moodLog:any[]; streakCount:number; userName:string; avatar:string|null; onNameChange:(n:string)=>void; onAvatarClick:()=>void; onSignOut:()=>void; diaryEntries:any[]; sosContacts:{id?:string;name:string;phone:string}[]; onSaveDiary:(content:string)=>void; onSaveContacts:(contacts:{id?:string;name:string;phone:string}[])=>void; onCompleteQuest:(id:string)=>void; isPremium:boolean; onUpgrade:()=>void}) {
+  const [activeSection, setActiveSection] = useState("overview");
+  const [contacts, setContacts] = useState<{id?:string;name:string;phone:string}[]>(sosContacts.length > 0 ? sosContacts : [{name:"",phone:""}]);
   const [diary, setDiary] = useState("");
+  const [diarySaved, setDiarySaved] = useState(false);
   const days = ["Po","Út","St","Čt","Pá","So","Ne"];
   const isPremium = subscriptionTier === "premium";
 
@@ -1355,7 +1399,8 @@ function ProfileTab({
               <input value={c.phone} onChange={(e)=>{const n=[...contacts];n[i].phone=e.target.value;setContacts(n)}} placeholder="Telefon" style={{width:120,padding:10,background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.t1,fontSize:13,fontFamily:"inherit"}}/>
             </div>
           ))}
-          <button onClick={()=>setContacts(p=>[...p,{name:"",phone:""}])} style={{padding:"8px 16px",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.accent,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:16}}>+ Přidat kontakt</button>
+          <button onClick={()=>setContacts(p=>[...p,{name:"",phone:""}])} style={{padding:"8px 16px",background:T.card,border:`1px solid ${T.border}`,borderRadius:10,color:T.accent,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginRight:8}}>+ Přidat</button>
+          <button onClick={()=>{onSaveContacts(contacts)}} style={{padding:"8px 16px",background:T.tealDim,border:`1px solid ${T.teal}30`,borderRadius:10,color:T.teal,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:16}}>💾 Uložit</button>
           <div style={{padding:14,background:T.redDim,border:`1px solid ${T.red}20`,borderRadius:14}}>
             <div style={{color:T.red,fontSize:15,fontWeight:800}}>📞 Linka bezpečí: 116 111</div>
             <div style={{color:T.t2,fontSize:12}}>Nonstop, zdarma, anonymně</div>
@@ -1368,7 +1413,36 @@ function ProfileTab({
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
             <span>🔒</span><span style={{color:T.t2,fontSize:13}}>Jen pro tebe. Nikdo jiný to neuvidí.</span>
           </div>
-          <textarea value={diary} onChange={(e)=>setDiary(e.target.value)} rows={12} placeholder="Vysyp hlavu... co ti běží hlavou?" style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,padding:16,fontSize:14,fontFamily:"inherit",resize:"none",lineHeight:1.7}}/>
+          <textarea value={diary} onChange={(e)=>setDiary(e.target.value)} rows={8} placeholder="Vysyp hlavu... co ti běží hlavou?" style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,padding:16,fontSize:14,fontFamily:"inherit",resize:"none",lineHeight:1.7}}/>
+          <button onClick={()=>{if(diary.trim()){onSaveDiary(diary);onCompleteQuest("diary");setDiary("");setDiarySaved(true);setTimeout(()=>setDiarySaved(false),2000)}}} style={{marginTop:8,padding:"10px 24px",background:T.tealDim,border:`1px solid ${T.teal}30`,borderRadius:10,color:T.teal,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+            {diarySaved ? "✓ Uloženo!" : "💾 Uložit zápis"}
+          </button>
+          {diaryEntries.length > 0 && (
+            <div style={{marginTop:16}}>
+              <div style={{color:T.t1,fontSize:14,fontWeight:700,marginBottom:8}}>Předchozí zápisky</div>
+              {(() => {
+                // Free users: only entries from last 7 days
+                const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+                const visibleEntries = isPremium ? diaryEntries : diaryEntries.filter((e: any) => new Date(e.created_at) >= sevenDaysAgo);
+                const hiddenCount = diaryEntries.length - visibleEntries.length;
+                return (
+                  <>
+                    {visibleEntries.slice(0,10).map((e:any,i:number) => (
+                      <div key={e.id||i} style={{padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,marginBottom:8}}>
+                        <div style={{color:T.t2,fontSize:11,marginBottom:4}}>{new Date(e.created_at).toLocaleString("cs-CZ")}</div>
+                        <div style={{color:T.t1,fontSize:13,lineHeight:1.5}}>{e.content}</div>
+                      </div>
+                    ))}
+                    {hiddenCount > 0 && (
+                      <button onClick={onUpgrade} style={{width:"100%",padding:14,background:`${T.accent}08`,border:`1px dashed ${T.accent}40`,borderRadius:12,color:T.accent,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>
+                        🔒 +{hiddenCount} starších zápisů · Odemkni Premium
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
 
@@ -1464,6 +1538,7 @@ function SOSOverlay({onClose, isPremium, onUpgrade}: {onClose:()=>void; isPremiu
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [musicError, setMusicError] = useState<string|null>(null);
   const musicAudioRef = useRef<HTMLAudioElement|null>(null);
+  const abortRef = useRef<AbortController|null>(null);
 
   const pickRandomSpeech = () => {
     const s = SOS_SPEECHES[Math.floor(Math.random() * SOS_SPEECHES.length)];
@@ -1503,6 +1578,9 @@ function SOSOverlay({onClose, isPremium, onUpgrade}: {onClose:()=>void; isPremiu
       happy: { freqs: [262, 330, 392, 523], type: "sine", lfoRate: 0.2, filterFreq: 2000 },
       lofi:  { freqs: [196, 247, 294], type: "triangle", lfoRate: 0.12, filterFreq: 950 },
       rage:  { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
+      metal: { freqs: [110, 165, 220], type: "sawtooth", lfoRate: 0.3, filterFreq: 1200 },
+      lofi:  { freqs: [196, 247, 294, 370], type: "triangle", lfoRate: 0.05, filterFreq: 500 },
+      rage:  { freqs: [82, 123, 165], type: "sawtooth", lfoRate: 0.5, filterFreq: 1800 },
     };
     const cfg = configs[genre.id] || configs.calm;
 
@@ -1543,16 +1621,20 @@ function SOSOverlay({onClose, isPremium, onUpgrade}: {onClose:()=>void; isPremiu
 
   const playMusic = async (genre: typeof SOS_MUSIC_GENRES[0]) => {
     if (musicAudioRef.current) { musicAudioRef.current.pause(); musicAudioRef.current = null; }
+    if (abortRef.current) { abortRef.current.abort(); }
     stopWebAudio();
     setMusicGenre(genre);
     setMusicLoading(true);
     setMusicPlaying(false);
     setMusicError(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-music`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
         body: JSON.stringify({ prompt: genre.prompt, duration: 22 }),
+        signal: controller.signal,
       });
       if (!response.ok) throw new Error("Music generation failed");
       const blob = await response.blob();
@@ -1738,10 +1820,14 @@ export default function Index() {
   const { signOut } = useAuth();
   const cloud = useCloudData();
   const { moodLog, xp, streakCount, completedQuests, equippedSkin, subscriptionTier, userName, lastCheckinDate, loading: cloudLoading } = cloud;
+  const premium = usePremium();
+  const { moodLog, xp, streakCount, completedQuests, equippedSkin, userName, lastCheckinDate, loading: cloudLoading } = cloud;
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [tab, setTab] = useState("feel");
   const [showSOS, setShowSOS] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState("");
   const [avatar, setAvatar] = useState<string|null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [xpPopup, setXpPopup] = useState<{xp:number;label:string}|null>(null);
@@ -1753,8 +1839,27 @@ export default function Index() {
   const isPremium = subscriptionTier === "premium";
   const [profileSection, setProfileSection] = useState<"overview"|"premium"|"library"|"insights"|"contacts"|"diary"|"calendar">("overview");
   const [chatSeed, setChatSeed] = useState<string | null>(null);
+  const [sliderIndex, setSliderIndex] = useState(3); // middle = meh
+  const [selectedMood, setSelectedMood] = useState<any>(null);
+  const [selectedReason, setSelectedReason] = useState<any>(null);
+  const [intensity, setIntensity] = useState(3);
+  const [peerEcho, setPeerEcho] = useState<Record<string, number>>({});
+  const [shareCard, setShareCard] = useState<{quote:string;rank:string;mood:string}|null>(null);
+  const [recs, setRecs] = useState<any>(null);
 
-  // Show onboarding for new users (no name set yet)
+  const requirePremium = (feature: string) => {
+    if (premium.isPremium) return false;
+    setPaywallFeature(feature);
+    setShowPaywall(true);
+    return true;
+  };
+
+  // Show onboarding for new users (onboarded flag not set)
+  useEffect(() => {
+    if (!cloudLoading && cloud.profile && !cloud.profile.onboarded) setShowOnboarding(true);
+  }, [cloudLoading, cloud.profile]);
+
+  // Fetch anonymous peer echo (how many warriors felt each mood today)
   useEffect(() => {
     if (!cloudLoading && !userName) setShowOnboarding(true);
   }, [cloudLoading, userName]);
@@ -1771,6 +1876,26 @@ export default function Index() {
     if (mood) {
       setSelectedMood(mood);
       setStep(1);
+    supabase.rpc("get_today_mood_counts").then(({ data }) => {
+      if (data) {
+        const counts: Record<string, number> = {};
+        (data as any[]).forEach((r: any) => { counts[r.mood_id] = Number(r.count); });
+        setPeerEcho(counts);
+      }
+    });
+  }, [moodLog.length]);
+
+  const handleOnboardingComplete = async (newName: string, moodId: string) => {
+    if (newName) cloud.updateName(newName);
+    const uid = cloud.profile?.id;
+    if (uid) {
+      await supabase.from("profiles").update({ onboarded: true } as any).eq("id", uid);
+    }
+    const moodIdx = MOODS.findIndex(m => m.id === moodId);
+    if (moodIdx >= 0) {
+      setSliderIndex(moodIdx);
+      setSelectedMood(MOODS[moodIdx]);
+      setStep(1); // show slider screen with pre-selected mood
     }
     setShowOnboarding(false);
   };
@@ -1832,22 +1957,24 @@ export default function Index() {
   const selectMood = (m: MoodOption) => { setSelectedMood(m); setStep(1); };
   const selectReason = (r: ReasonOption) => {
     if (!selectedMood) return;
+  const handleSliderChange = (idx: number) => { setSliderIndex(idx); setSelectedMood(MOODS[idx]); setIntensity(3); };
+  const selectMood = (m: any) => { setSelectedMood(m); setIntensity(3); };
+  const confirmMood = () => { if (selectedMood) setStep(2); };
+  const selectReason = (r: any) => {
     setSelectedReason(r);
     cloud.logMood(selectedMood.id, r.id);
     const today = new Date().toISOString().split("T")[0];
     const isNewDay = lastCheckinDate !== today;
     let newStreak = streakCount;
     if (isNewDay) {
-      // Check if yesterday was the last check-in (continuing streak) or gap (reset)
       if (lastCheckinDate) {
         const lastDate = new Date(lastCheckinDate);
         const diff = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
         newStreak = diff <= 1 ? streakCount + 1 : 1;
       } else {
-        newStreak = 1; // first ever check-in
+        newStreak = 1;
       }
     }
-    // else: same day, streak stays the same
     cloud.updateProgress(xp, newStreak, completedQuests);
     setRecs(getRecommendations(selectedMood, r));
     setStep(3);
@@ -1855,7 +1982,13 @@ export default function Index() {
     if (newStreak >= 3) completeQuest("streak3");
     if (newStreak >= 7) completeQuest("streak7");
   };
-  const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); };
+  const resetFlow = () => { setStep(1); setSelectedMood(null); setSelectedReason(null); setRecs(null); setIntensity(3); setShareCard(null); setSliderIndex(3); };
+
+  const handleSpeechComplete = (speech: any) => {
+    completeQuest("speech");
+    const rank = getWarriorRank(xp);
+    setShareCard({ quote: speech.title, rank: rank.name, mood: selectedMood?.label || "" });
+  };
 
   const lastMoodMonkey = selectedMood ? MOOD_MONKEY[selectedMood.id] : (moodLog.length > 0 ? MOOD_MONKEY[moodLog[0].mood.id] : null);
 
@@ -1919,10 +2052,23 @@ export default function Index() {
       `}</style>
       <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatar} style={{display:"none"}}/>
       {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)} isPremium={isPremium} onUpgrade={openUpgrade} />}
+      {showSOS && <SOSOverlay onClose={()=>setShowSOS(false)}/>}
+      {showPaywall && <PaywallOverlay onClose={()=>setShowPaywall(false)} premium={premium} feature={paywallFeature} />}
       {xpPopup && <XpPopup xp={xpPopup.xp} label={xpPopup.label} onDone={() => setXpPopup(null)} />}
       {levelUp && <LevelUpOverlay level={levelUp.level} skin={levelUp.skin} onDone={() => setLevelUp(null)} />}
 
       <div style={{flex:1,overflowY:"auto",padding:"0 16px 16px",display:"flex",flexDirection:"column"}}>
+        {/* Trial banner */}
+        {premium.isTrial && (
+          <div style={{padding:"8px 16px",background:`linear-gradient(90deg, ${T.accent}20, ${T.purple}15)`,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"space-between",margin:"8px 0"}}>
+            <div style={{color:T.accent,fontSize:12,fontWeight:700}}>👑 Premium trial · {premium.trialDaysLeft} dní zbývá</div>
+          </div>
+        )}
+        {premium.status === "expired" && (
+          <button onClick={()=>requirePremium("Premium")} style={{padding:"10px 16px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:12,color:T.accent,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",margin:"8px 0",textAlign:"center"}}>
+            ⏰ Trial skončil — odemkni Premium za 99 CZK/měs
+          </button>
+        )}
         {/* ════════ FEEL TAB ════════ */}
         {tab === "feel" && (
           <div>
@@ -1935,7 +2081,9 @@ export default function Index() {
                 <input value={userName} onChange={e=>handleNameChange(e.target.value)} placeholder="Tvoje jméno…"
                   style={{background:"transparent",border:"none",outline:"none",color:T.t1,fontFamily:"inherit",fontSize:15,fontWeight:700,width:"100%"}} />
                 <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
-                  <span style={{color:T.accent,fontSize:13,fontWeight:800}}>{streakCount} dní v řadě 🔥</span>
+                  <span style={{color:getWarriorRank(xp).color,fontSize:11,fontWeight:700}}>{getWarriorRank(xp).name}</span>
+                  <span style={{color:T.t3,fontSize:11}}>·</span>
+                  <span style={{color:T.accent,fontSize:13,fontWeight:800}}>{streakCount}🔥</span>
                 </div>
               </div>
               {lastMoodMonkey ? (
@@ -2004,6 +2152,99 @@ export default function Index() {
                         </button>
                       );
                     })}
+            {/* STEP 1 — How are you? Good / OK / Bad */}
+            {step === 1 && (
+              <>
+                <InAppNotifications lastCheckinDate={lastCheckinDate} streakCount={streakCount} userName={userName} onNavigate={(t) => { setTab(t); resetFlow(); }} />
+                
+                {/* Single-screen: Emotion Slider + Intensity */}
+                <div className="anim-fadeUp" style={{display:"flex",alignItems:"center",gap:14,marginBottom:20,padding:20,background:`linear-gradient(135deg, ${T.accent}15, transparent)`,borderRadius:24,border:`1px solid ${T.accent}20`}}>
+                  <img src={MOOD_MONKEY[MOODS[sliderIndex]?.id] || monkeyHero} alt="" className="tab-monkey" style={{width:72,height:72,objectFit:"contain",transition:"all .3s"}} />
+                  <div>
+                    <div style={{color:MOODS[sliderIndex]?.color||T.t1,fontSize:26,fontWeight:900,letterSpacing:-0.5,transition:"color .3s"}}>{MOODS[sliderIndex]?.label}</div>
+                    <div style={{color:T.t2,fontSize:13,marginTop:2}}>{MOODS[sliderIndex]?.sub}</div>
+                  </div>
+                </div>
+
+                {/* Emoji row */}
+                <div style={{display:"flex",justifyContent:"space-between",padding:"0 4px",marginBottom:4}}>
+                  {MOODS.map((m,i)=>(
+                    <button key={m.id} onClick={()=>handleSliderChange(i)} style={{
+                      fontSize: sliderIndex===i ? 32 : 20, transition:"all .2s",
+                      background:"none",border:"none",cursor:"pointer",padding:2,
+                      opacity: sliderIndex===i ? 1 : 0.5,
+                      transform: sliderIndex===i ? "scale(1.2)" : "scale(1)",
+                    }}>{m.emoji}</button>
+                  ))}
+                </div>
+
+                {/* Slider track */}
+                <div style={{position:"relative",padding:"0 8px",marginBottom:24}}>
+                  <input type="range" min={0} max={MOODS.length-1} value={sliderIndex}
+                    onChange={e=>handleSliderChange(Number(e.target.value))}
+                    style={{
+                      width:"100%",height:8,appearance:"none",WebkitAppearance:"none",
+                      background:`linear-gradient(90deg, ${T.red}, ${T.accent}, ${T.teal})`,
+                      borderRadius:99,outline:"none",cursor:"pointer",
+                    }}
+                  />
+                  <style>{`
+                    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:${MOODS[sliderIndex]?.color||T.accent};border:3px solid #fff;box-shadow:0 0 12px ${MOODS[sliderIndex]?.color||T.accent}80;cursor:pointer;transition:all .2s}
+                    input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:${MOODS[sliderIndex]?.color||T.accent};border:3px solid #fff;box-shadow:0 0 12px ${MOODS[sliderIndex]?.color||T.accent}80;cursor:pointer}
+                  `}</style>
+                </div>
+
+                {/* Intensity */}
+                <div className="anim-fadeUp" style={{padding:20,background:T.card,border:`1px solid ${MOODS[sliderIndex]?.color||T.accent}20`,borderRadius:20,marginBottom:16}}>
+                  <div style={{color:T.t1,fontSize:16,fontWeight:800,marginBottom:12,textAlign:"center"}}>Jak moc to cítíš?</div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                    <span style={{color:T.t2,fontSize:22}}>😌</span>
+                    <div style={{flex:1,display:"flex",gap:6}}>
+                      {[1,2,3,4,5].map(n => (
+                        <button key={n} onClick={()=>setIntensity(n)}
+                          style={{
+                            flex:1,height:44,borderRadius:12,
+                            background:intensity===n ? `${MOODS[sliderIndex]?.color||T.accent}30` : intensity >= n ? `${MOODS[sliderIndex]?.color||T.accent}10` : "transparent",
+                            border:`2px solid ${intensity>=n ? MOODS[sliderIndex]?.color||T.accent : T.border}`,
+                            color:intensity>=n ? MOODS[sliderIndex]?.color||T.accent : T.t3,
+                            fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit",
+                            transition:"all .2s",
+                          }}>{n}</button>
+                      ))}
+                    </div>
+                    <span style={{color:T.t2,fontSize:22}}>🔥</span>
+                  </div>
+                  <div style={{color:T.t2,fontSize:13,textAlign:"center"}}>
+                    {intensity <= 2 ? "Lehce to cítíš" : intensity <= 3 ? "Střední intenzita" : intensity === 4 ? "Cítíš to silně" : "Na plný — Goggins mode 💀"}
+                  </div>
+                </div>
+
+                {/* Peer echo */}
+                {Object.values(peerEcho).reduce((a,b)=>a+b,0) > 0 && (
+                  <div className="anim-fadeUp" style={{padding:12,background:`${MOODS[sliderIndex]?.color||T.accent}08`,border:`1px solid ${MOODS[sliderIndex]?.color||T.accent}15`,borderRadius:12,marginBottom:16,textAlign:"center"}}>
+                    <span style={{color:MOODS[sliderIndex]?.color||T.accent,fontSize:14,fontWeight:700}}>
+                      {peerEcho[MOODS[sliderIndex]?.id] || 0} opičích válečníků cítí {MOODS[sliderIndex]?.label.toLowerCase()} dnes
+                    </span>
+                    <div style={{color:T.t3,fontSize:11,marginTop:2}}>Nejsi v tom sám/a 🐵</div>
+                  </div>
+                )}
+
+                {/* Continue */}
+                <button onClick={()=>{setSelectedMood(MOODS[sliderIndex]);confirmMood()}} className="reason-card" style={{width:"100%",padding:"16px 0",background:`linear-gradient(135deg, ${MOODS[sliderIndex]?.color||T.accent}25, ${MOODS[sliderIndex]?.color||T.accent}10)`,border:`1px solid ${MOODS[sliderIndex]?.color||T.accent}35`,borderRadius:16,color:MOODS[sliderIndex]?.color||T.accent,fontSize:17,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>
+                  Pokračuj →
+                </button>
+              </>
+            )}
+
+            {/* STEP 2 — why */}
+            {step === 2 && (
+              <>
+                <button onClick={()=>setStep(2)} style={{background:"none",border:"none",color:T.t2,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12,display:"flex",alignItems:"center",gap:4}}>← Zpět</button>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
+                  <img src={MOOD_MONKEY[selectedMood.id] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
+                  <div>
+                    <div style={{color:T.t1,fontSize:15,fontWeight:700}}>Cítíš se: {selectedMood.label} ({intensity}/5)</div>
+                    <div style={{color:T.t2,fontSize:12}}>Co za tím stojí?</div>
                   </div>
                 </div>
 
@@ -2023,14 +2264,14 @@ export default function Index() {
               </>
             )}
 
-            {/* STEP 3 — tailored results (merged: speeches + breathing + tools) */}
+            {/* STEP 3 — tailored results */}
             {step === 3 && recs && (
               <>
                 <button onClick={resetFlow} style={{background:"none",border:"none",color:T.accent,fontSize:13,cursor:"pointer",fontFamily:"inherit",marginBottom:12}}>← Nový check-in</button>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:12,background:`linear-gradient(135deg, ${selectedMood.color}12, transparent)`,borderRadius:14,border:`1px solid ${selectedMood.color}25`}}>
                   <img src={EMO_MONKEY[recs.emo] || monkeyHero} alt="" style={{width:48,height:48,objectFit:"contain"}} loading="lazy" />
                   <div>
-                    <div style={{color:T.t1,fontSize:14,fontWeight:700}}>{selectedMood.label} · {selectedReason.label}</div>
+                    <div style={{color:T.t1,fontSize:14,fontWeight:700}}>{selectedMood.label} · {selectedReason.label} · {intensity}/5</div>
                     <div style={{color:T.t2,fontSize:12}}>Opice ti vybrala tohle 👇</div>
                   </div>
                 </div>
@@ -2043,6 +2284,7 @@ export default function Index() {
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:10}}>
                     {recs.speeches.map((s: Speech) => (
+                    {(premium.isPremium ? recs.speeches : recs.speeches.slice(0,1)).map((s: any) => (
                       <div key={s.id} className="speech-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                           <span style={{fontSize:22}}>{s.icon}</span>
@@ -2052,9 +2294,18 @@ export default function Index() {
                           </div>
                         </div>
                         <div style={{color:T.t2,fontSize:13,marginBottom:10,lineHeight:1.5}}>{s.text.substring(0,140)}...</div>
-                        <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo}/>
+                        <SpeechPlayer text={s.text} label="Přehraj řeč" speechId={s.id} emotion={s.emo} intensity={intensity} onComplete={()=>handleSpeechComplete(s)}/>
                       </div>
                     ))}
+                    {!premium.isPremium && recs.speeches.length > 1 && (
+                      <button onClick={()=>requirePremium("Plná knihovna řečí")} className="reason-card" style={{display:"flex",alignItems:"center",gap:12,padding:16,background:`${T.accent}08`,border:`1px dashed ${T.accent}40`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                        <span style={{fontSize:28}}>🔒</span>
+                        <div>
+                          <div style={{color:T.accent,fontSize:14,fontWeight:800}}>+{recs.speeches.length - 1} dalších řečí</div>
+                          <div style={{color:T.t2,fontSize:12}}>Odemkni Premium pro přístup ke všem</div>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -2065,11 +2316,11 @@ export default function Index() {
                     <span style={{color:T.t1,fontSize:16,fontWeight:800}}>Zklidni opici — dýchej</span>
                   </div>
                   <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16}}>
-                    <BreathingExercise type={recs.breathType}/>
+                    <BreathingExercise type={recs.breathType} onComplete={()=>completeQuest("breathe")}/>
                   </div>
                 </div>
 
-                {/* Heavy metal */}
+                {/* Heavy metal — use SOS music instead */}
                 {recs.showMetal && (
                   <div style={{marginBottom:20}}>
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
@@ -2078,6 +2329,12 @@ export default function Index() {
                     </div>
                     <button onClick={()=>{try{const AudioContextCtor = window.AudioContext || (window as WebkitAudioWindow).webkitAudioContext; if (!AudioContextCtor) return; const c = new AudioContextCtor(); const o = c.createOscillator(); const g = c.createGain(); o.type="sawtooth"; o.frequency.value=82+Math.random()*40; g.gain.value=0.3; o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+4); g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+4);} catch (error) { console.error("Heavy metal fallback failed", error); }}} style={{width:"100%",padding:"16px",background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,color:T.red,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>
                       🤘 HEAVY METAL — BLAST 🔊
+                    <button onClick={()=>setShowSOS(true)} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:T.redDim,border:`1px solid ${T.red}30`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+                      <img src={monkeyMusic} alt="" style={{width:40,height:40,objectFit:"contain"}} loading="lazy"/>
+                      <div>
+                        <div style={{color:T.red,fontSize:16,fontWeight:900}}>🤘 Vypusť páru — Hudba</div>
+                        <div style={{color:T.t2,fontSize:12}}>Metal, rage a další žánry v SOS</div>
+                      </div>
                     </button>
                   </div>
                 )}
@@ -2094,19 +2351,88 @@ export default function Index() {
                       {[{n:5,q:"Co vidíš?"},{n:4,q:"Co cítíš dotykem?"},{n:3,q:"Co slyšíš?"},{n:2,q:"Co cítíš vůní?"},{n:1,q:"Jaká chuť?"}].map(s=>
                         <div key={s.n} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                           <span style={{color:T.accent,fontSize:20,fontWeight:900}}>{s.n}</span>
-                          <input placeholder={s.q} style={{flex:1,padding:8,background:"transparent",border:`1px solid ${T.border}`,borderRadius:8,color:T.t1,fontSize:13,fontFamily:"inherit"}}/>
+                          <input placeholder={s.q} onChange={(e)=>{if(e.target.value.trim()&&s.n===1)completeQuest("grounding")}} style={{flex:1,padding:8,background:"transparent",border:`1px solid ${T.border}`,borderRadius:8,color:T.t1,fontSize:13,fontFamily:"inherit"}}/>
                         </div>
                       )}
                     </div>
                   </div>
                 )}
 
+                {/* Share warrior card — visual canvas-based */}
+                {shareCard && (
+                  <div className="anim-fadeUp" style={{marginBottom:20}}>
+                    {/* Card preview */}
+                    <div id="warrior-card" style={{
+                      padding:24,borderRadius:24,textAlign:"center",position:"relative",overflow:"hidden",
+                      background:`linear-gradient(145deg, #1a1030 0%, #0d0f1a 40%, ${selectedMood?.color || T.accent}15 100%)`,
+                      border:`1px solid ${T.accent}30`,
+                    }}>
+                      {/* Decorative elements */}
+                      <div style={{position:"absolute",top:-20,right:-20,width:100,height:100,borderRadius:"50%",background:`radial-gradient(circle,${selectedMood?.color || T.accent}20,transparent)`,filter:"blur(20px)"}} />
+                      <div style={{position:"absolute",bottom:-30,left:-30,width:120,height:120,borderRadius:"50%",background:`radial-gradient(circle,${T.purple}15,transparent)`,filter:"blur(25px)"}} />
+                      
+                      <div style={{fontSize:14,color:T.t3,fontWeight:600,letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>🐵 Monkey Mind</div>
+                      <div style={{fontSize:32,marginBottom:8}}>⚔️</div>
+                      <div style={{color:T.t1,fontSize:22,fontWeight:900,marginBottom:6,lineHeight:1.2}}>Warrior Moment</div>
+                      <div style={{color:selectedMood?.color || T.accent,fontSize:16,fontWeight:700,marginBottom:12,fontStyle:"italic",lineHeight:1.4}}>„{shareCard.quote}"</div>
+                      
+                      {/* Mood transformation */}
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}>
+                        <div style={{padding:"6px 14px",background:`${selectedMood?.color || T.accent}15`,border:`1px solid ${selectedMood?.color || T.accent}30`,borderRadius:99}}>
+                          <span style={{color:selectedMood?.color || T.accent,fontSize:13,fontWeight:700}}>{selectedMood?.label || "?"}</span>
+                        </div>
+                        <span style={{color:T.t3,fontSize:16}}>→</span>
+                        <div style={{padding:"6px 14px",background:`${T.teal}15`,border:`1px solid ${T.teal}30`,borderRadius:99}}>
+                          <span style={{color:T.teal,fontSize:13,fontWeight:700}}>Silnější 💪</span>
+                        </div>
+                      </div>
+                      
+                      {/* Rank badge */}
+                      <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 18px",background:`${getWarriorRank(xp).color}12`,border:`1px solid ${getWarriorRank(xp).color}25`,borderRadius:99,marginBottom:8}}>
+                        <span style={{color:getWarriorRank(xp).color,fontSize:14,fontWeight:800}}>{shareCard.rank}</span>
+                      </div>
+                      
+                      <div style={{color:T.t3,fontSize:11,marginTop:8}}>monkeymind.lovable.app</div>
+                    </div>
+                    
+                    {/* Action buttons */}
+                    <div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>
+                      <button onClick={async ()=>{
+                        // Try canvas-based image share
+                        try {
+                          const el = document.getElementById("warrior-card");
+                          if (el) {
+                            // Fallback: share as text with visual indicator
+                            const text = `🐵 Monkey Mind warrior moment!\n⚔️ „${shareCard.quote}"\n${shareCard.rank}\n${selectedMood?.label} → Silnější 💪\nmonkeymind.lovable.app`;
+                            if (navigator.share) {
+                              await navigator.share({title:"Monkey Mind Warrior",text});
+                            } else {
+                              await navigator.clipboard.writeText(text);
+                              setXpPopup({xp:0,label:"Zkopírováno! 📋"});
+                            }
+                          }
+                        } catch { /* user cancelled */ }
+                      }} className="reason-card" style={{padding:"12px 28px",background:`linear-gradient(135deg, ${T.accent}20, ${T.accent}08)`,border:`1px solid ${T.accent}40`,borderRadius:99,color:T.accent,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                        📤 Sdílej na sítě
+                      </button>
+                      <button onClick={()=>{
+                        const text = `🐵 „${shareCard.quote}" · ${shareCard.rank}\nmonkeymind.lovable.app`;
+                        navigator.clipboard.writeText(text).then(()=>setXpPopup({xp:0,label:"Zkopírováno! 📋"}));
+                      }} className="reason-card" style={{padding:"12px 20px",background:T.card,border:`1px solid ${T.border}`,borderRadius:99,color:T.t2,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+                        📋 Kopírovat
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Talk to Opičák CTA */}
-                <button onClick={()=>setTab("chat")} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.teal}12, ${T.blue}08)`,border:`1px solid ${T.teal}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:10}}>
+                <button onClick={()=>{ if (!requirePremium("Opičák AI chat")) setTab("chat"); }} className="reason-card" style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:16,background:`linear-gradient(135deg, ${T.teal}12, ${T.blue}08)`,border:`1px solid ${T.teal}25`,borderRadius:16,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:10}}>
                   <img src={monkeyChat} alt="" style={{width:44,height:44,objectFit:"contain",borderRadius:12}} />
                   <div>
                     <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Chceš si promluvit? 🐵 {!isPremium && <span style={{color:T.accent,fontSize:11}}>Premium</span>}</div>
                     <div style={{color:T.t2,fontSize:12}}>{isPremium ? "Opičák ti pomůže — pokecej s ním" : "AI Opičák je v Premium. Check-in a SOS zůstávají free."}</div>
+                    <div style={{color:T.t1,fontSize:15,fontWeight:800}}>Chceš si promluvit? {premium.isPremium ? "🐵" : "👑"}</div>
+                    <div style={{color:T.t2,fontSize:12}}>{premium.isPremium ? "Opičák ti pomůže — pokecej s ním" : "Premium · Odemkni AI chat"}</div>
                   </div>
                 </button>
 
@@ -2152,6 +2478,16 @@ export default function Index() {
 
         {/* ════════ CHAT TAB ════════ */}
         {tab === "chat" && <MonkeyChat isPremium={isPremium} onUpgrade={openUpgrade} initialPrompt={chatSeed} />}
+        {tab === "chat" && (premium.isPremium ? <MonkeyChat /> : (
+          <div className="anim-fadeUp" style={{textAlign:"center",padding:"40px 16px"}}>
+            <img src={monkeyChat} alt="" className="anim-float" style={{width:80,height:80,objectFit:"contain",margin:"0 auto 16px"}} />
+            <div style={{color:T.t1,fontSize:20,fontWeight:900,marginBottom:8}}>Opičák je Premium 👑</div>
+            <div style={{color:T.t2,fontSize:14,lineHeight:1.6,marginBottom:20}}>AI chat má provozní náklady — je součástí Premium plánu. Zkus 7 dní zdarma!</div>
+            <button onClick={()=>requirePremium("Opičák AI chat")} style={{padding:"14px 32px",background:`linear-gradient(135deg, ${T.accent}, #FF9A5C)`,border:"none",borderRadius:14,color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 0 20px ${T.accent}40`}}>
+              Odemknout Opičáka 🐵
+            </button>
+          </div>
+        ))}
 
         {/* ════════ QUESTS TAB ════════ */}
         {tab === "quests" && <QuestsTab xp={xp} completedQuests={completedQuests} onEquipSkin={equipSkin} equippedSkin={equippedSkin} />}
@@ -2172,6 +2508,7 @@ export default function Index() {
             onOpenChat={openChatWithPrompt}
             onCopyAsk={copyParentAsk}
           />
+          <ProfileTab moodLog={moodLog} streakCount={streakCount} userName={userName} avatar={avatar} onNameChange={handleNameChange} onAvatarClick={()=>fileRef.current?.click()} onSignOut={signOut} diaryEntries={cloud.diaryEntries} sosContacts={cloud.sosContacts} onSaveDiary={(content)=>cloud.saveDiaryEntry(content)} onSaveContacts={(contacts)=>cloud.saveSosContacts(contacts)} onCompleteQuest={completeQuest} isPremium={premium.isPremium} onUpgrade={()=>requirePremium("Plný deník & historie")} />
         )}
       </div>
 

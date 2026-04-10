@@ -66,8 +66,12 @@ serve(async (req) => {
       if (!sfxResponse.ok) {
         const errText = await sfxResponse.text();
         console.error("SFX API also failed:", sfxResponse.status, errText);
-        return new Response(JSON.stringify({ error: "Both Music and SFX APIs failed", details: errText }), {
-          status: sfxResponse.status,
+        return new Response(JSON.stringify({ 
+          error: "SERVICE_UNAVAILABLE", 
+          fallback: true,
+          details: errText 
+        }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

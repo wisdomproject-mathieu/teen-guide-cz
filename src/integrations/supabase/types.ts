@@ -70,6 +70,7 @@ export type Database = {
           equipped_skin: string | null
           id: string
           subscription_tier: string
+          onboarded: boolean | null
           updated_at: string
         }
         Insert: {
@@ -79,6 +80,7 @@ export type Database = {
           equipped_skin?: string | null
           id: string
           subscription_tier?: string
+          onboarded?: boolean | null
           updated_at?: string
         }
         Update: {
@@ -88,6 +90,7 @@ export type Database = {
           equipped_skin?: string | null
           id?: string
           subscription_tier?: string
+          onboarded?: boolean | null
           updated_at?: string
         }
         Relationships: []
@@ -112,6 +115,51 @@ export type Database = {
           id?: string
           name?: string
           phone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          trial_end: string | null
+          trial_start: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          trial_start?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          trial_start?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -151,7 +199,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_today_mood_counts: {
+        Args: never
+        Returns: {
+          count: number
+          mood_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

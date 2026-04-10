@@ -5,6 +5,7 @@ const T = {
   teal: "#00D4AA", tealDim: "rgba(0,212,170,0.12)", red: "#FF3B5C",
   redDim: "rgba(255,59,92,0.12)", t1: "#F0EEFF", t2: "#9298B4",
   border: "rgba(255,255,255,0.08)", card: "rgba(255,255,255,0.04)",
+  blue: "#4A8FFF", purple: "#A855F7",
 };
 
 type Notification = {
@@ -16,6 +17,85 @@ type Notification = {
   action?: string;
 };
 
+function getTimeBasedNotifications(userName: string): Notification[] {
+  const notes: Notification[] = [];
+  const now = new Date();
+  const hour = now.getHours();
+  const day = now.getDay(); // 0=Sun, 1=Mon
+
+  // Sunday 8-10pm — "nedělní dread"
+  if (day === 0 && hour >= 20 && hour <= 22) {
+    notes.push({
+      id: "sunday-dread",
+      icon: "🌙",
+      title: "Nedělní úzkost? Normální.",
+      subtitle: "Zítra je pondělí — ale ty jsi opičí válečník. Dýchej, odpočiň, budeš ready.",
+      color: T.purple,
+      action: "feel",
+    });
+  }
+
+  // Monday 6-8am — "pondělní war cry"
+  if (day === 1 && hour >= 6 && hour <= 8) {
+    notes.push({
+      id: "monday-warcry",
+      icon: "⚔️",
+      title: `Pondělí = tvůj den${userName ? `, ${userName}` : ""}!`,
+      subtitle: "Goggins mode ON. Check-in a nastav tón celýmu týdnu. 💀",
+      color: T.accent,
+      action: "feel",
+    });
+  }
+
+  // Post-school (14:00 - 16:00, weekdays)
+  if (day >= 1 && day <= 5 && hour >= 14 && hour <= 16) {
+    notes.push({
+      id: "post-school",
+      icon: "🎒",
+      title: "Konec školy — jak to bylo?",
+      subtitle: "Quick check-in. Vypusť to z hlavy a jdi dál.",
+      color: T.teal,
+      action: "feel",
+    });
+  }
+
+  // Late night (23:00 - 2:00) — wind down
+  if (hour >= 23 || hour <= 2) {
+    notes.push({
+      id: "late-night",
+      icon: "😴",
+      title: "Pozdě v noci? Opice taky potřebuje spát.",
+      subtitle: "Zkus dýchání 4-7-8 a zavři oči. Zítra bude nový den.",
+      color: T.blue,
+    });
+  }
+
+  // Wednesday midweek boost (after school)
+  if (day === 3 && hour >= 15 && hour <= 18) {
+    notes.push({
+      id: "midweek",
+      icon: "💪",
+      title: "Půlka týdne za tebou!",
+      subtitle: "Tři dny máš za sebou. Jsi silnější než v pondělí.",
+      color: T.teal,
+    });
+  }
+
+  // Friday evening celebration
+  if (day === 5 && hour >= 15 && hour <= 19) {
+    notes.push({
+      id: "friday-vibes",
+      icon: "🎉",
+      title: "Pátek! Přežil/a jsi týden!",
+      subtitle: "Udělej check-in, uzavři týden jako warrior. 🐵",
+      color: T.accent,
+      action: "feel",
+    });
+  }
+
+  return notes;
+}
+
 function getNotifications(
   lastCheckinDate: string | null,
   streakCount: number,
@@ -23,6 +103,10 @@ function getNotifications(
 ): Notification[] {
   const notes: Notification[] = [];
   const today = new Date().toISOString().split("T")[0];
+
+  // Time-based smart notifications (priority)
+  const timeNotes = getTimeBasedNotifications(userName);
+  notes.push(...timeNotes);
 
   // Check-in reminder
   if (lastCheckinDate !== today) {
@@ -80,7 +164,13 @@ function getNotifications(
     }
   }
 
-  return notes;
+  // Deduplicate by id and limit to 2 most relevant
+  const seen = new Set<string>();
+  return notes.filter(n => {
+    if (seen.has(n.id)) return false;
+    seen.add(n.id);
+    return true;
+  }).slice(0, 2);
 }
 
 export default function InAppNotifications({

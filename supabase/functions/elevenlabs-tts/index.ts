@@ -22,7 +22,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, emotion } = await req.json();
+    const { text, emotion, intensity } = await req.json();
 
     if (!text || typeof text !== "string") {
       return new Response(JSON.stringify({ error: "text is required" }), {
@@ -41,7 +41,14 @@ serve(async (req) => {
 
     // Use Daniel voice - good for Czech/multilingual content
     const voiceId = "onwK4e9ZLuTAKqWW03F9";
-    const settings = VOICE_SETTINGS[emotion] || VOICE_SETTINGS.all;
+    const baseSettings = VOICE_SETTINGS[emotion] || VOICE_SETTINGS.all;
+    // Intensity modulation (1-5 scale): higher intensity = less stability, more style, faster
+    const intensityFactor = typeof intensity === "number" ? Math.max(1, Math.min(5, intensity)) : 3;
+    const settings = {
+      stability: Math.max(0.1, baseSettings.stability - (intensityFactor - 3) * 0.1),
+      style: Math.min(1, baseSettings.style + (intensityFactor - 3) * 0.08),
+      speed: Math.min(1.3, baseSettings.speed + (intensityFactor - 3) * 0.05),
+    };
 
     const response = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
@@ -80,6 +87,14 @@ serve(async (req) => {
         details: upstreamMessage || errText,
       }), {
         status: response.status,
+      // For auth/billing errors (401/402), signal client to use browser fallback
+      const isRecoverable = response.status === 401 || response.status === 402 || response.status >= 500;
+      return new Response(JSON.stringify({ 
+        error: isRecoverable ? "SERVICE_UNAVAILABLE" : "TTS generation failed", 
+        fallback: isRecoverable,
+        details: errText 
+      }), {
+        status: 200, // Return 200 so client can read the JSON body
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
