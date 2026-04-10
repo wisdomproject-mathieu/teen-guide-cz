@@ -1837,14 +1837,6 @@ export default function Index() {
   };
 
   const handleNameChange = (n: string) => { cloud.updateName(n); };
-  const openUpgrade = () => {
-    setTab("profile");
-    setProfileSection("premium");
-  };
-  const openChatWithPrompt = (prompt: string) => {
-    setChatSeed(prompt);
-    setTab("chat");
-  };
   const copyParentAsk = async () => {
     const text = "Ahoj, tahle appka mi fakt pomáhá uklidnit se, když mám stres nebo hádku. Premium stojí 799 Kč na rok a má chat, lepší obsah a SOS věci navíc. Myslím, že by mi to reálně pomohlo být víc v klidu doma i ve škole. Mohli bychom to prosím zkusit?";
     try {
