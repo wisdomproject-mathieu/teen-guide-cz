@@ -148,6 +148,31 @@ function mapTtsFallbackMessage(detail?: string | null) {
   return "Prémiový hlas je teď dočasně nedostupný. Pouštím náhradní hlas.";
 }
 
+function splitShortTranscript(text: string) {
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\n+/g, " ")
+    .trim();
+
+  if (!normalized) return [];
+
+  const sentenceChunks = (normalized.match(/[^.!?…]+[.!?…]+|[^.!?…]+$/g) || [])
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+
+  if (sentenceChunks.length > 1) {
+    return sentenceChunks;
+  }
+
+  const words = normalized.split(/\s+/).filter(Boolean);
+  const chunkSize = words.length > 24 ? 8 : words.length > 16 ? 6 : 5;
+  const chunks: string[] = [];
+  for (let index = 0; index < words.length; index += chunkSize) {
+    chunks.push(words.slice(index, index + chunkSize).join(" "));
+  }
+  return chunks.length > 0 ? chunks : [normalized];
+}
+
 type MoodOption = typeof MOODS[number];
 type ReasonOption = typeof REASONS[number];
 type RecommendationBundle = ReturnType<typeof getRecommendations>;
@@ -457,19 +482,26 @@ function MonkeyShortPlayer({
   onClose: () => void;
 }) {
   const lines = useMemo(
-    () => (item.shortLines && item.shortLines.length > 0 ? item.shortLines : [item.hook]),
-    [item.hook, item.shortLines]
+    () => {
+      const transcript = item.text?.trim() ? splitShortTranscript(item.text) : [];
+      if (transcript.length > 0) return transcript;
+      if (item.shortLines && item.shortLines.length > 0) return item.shortLines;
+      return [item.hook];
+    },
+    [item.hook, item.shortLines, item.text]
   );
   const [lineIndex, setLineIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [voicePlaying, setVoicePlaying] = useState(false);
+  const [motionBeat, setMotionBeat] = useState(0);
   const shortVisual = getShortVisual(item);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const browserSpeechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const timersRef = useRef<number[]>([]);
   const [captionPulseKey, setCaptionPulseKey] = useState(0);
+  const shortIntensity = Math.max(4, ...item.intensity);
 
   const sceneDurations = useMemo(() => {
     const wordCounts = lines.map((line) => Math.max(1, line.trim().split(/\s+/).length));
@@ -481,6 +513,19 @@ function MonkeyShortPlayer({
     timersRef.current.forEach((timer) => window.clearTimeout(timer));
     timersRef.current = [];
   }, []);
+
+  useEffect(() => {
+    if (!playing && !voicePlaying) {
+      setMotionBeat(0);
+      return;
+    }
+
+    const tick = window.setInterval(() => {
+      setMotionBeat((current) => current + 1);
+    }, voicePlaying ? 180 : 260);
+
+    return () => window.clearInterval(tick);
+  }, [playing, voicePlaying]);
 
   const runCaptionSequence = useCallback((totalMs: number) => {
     clearCaptionTimers();
@@ -528,7 +573,7 @@ function MonkeyShortPlayer({
 
   const progress = ((lineIndex + 1) / lines.length) * 100;
   const fullText = item.text || lines.join(" ");
-  const shareText = `${item.title}\n\n${lines[lineIndex]}\n\nMonkey Mind`;
+  const shareText = `${item.title}\n\n${fullText}\n\nMonkey Mind`;
   const nextLine = lines[lineIndex + 1] ?? null;
   const captionDuration = Math.max(2, Math.round(sceneDurations[lineIndex] || item.durationSeconds / lines.length));
   const shortMotionClass = voicePlaying
@@ -563,7 +608,7 @@ function MonkeyShortPlayer({
         const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
           method: "POST",
           headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-          body: JSON.stringify({ text: fullText, emotion: item.emotion || "all" }),
+          body: JSON.stringify({ text: fullText, emotion: item.emotion || "all", intensity: shortIntensity }),
         });
         if (!response.ok) {
           const detail = await response.text().catch(() => "");
@@ -577,6 +622,12 @@ function MonkeyShortPlayer({
       const audio = new Audio(audioUrl);
       audio.preload = "auto";
       audioRef.current = audio;
+      audio.onloadedmetadata = () => {
+        const durationMs = Number.isFinite(audio.duration) && audio.duration > 0
+          ? audio.duration * 1000
+          : item.durationSeconds * 1000;
+        runCaptionSequence(durationMs);
+      };
       audio.onended = () => {
         setVoicePlaying(false);
         setVoiceLoading(false);
@@ -591,9 +642,8 @@ function MonkeyShortPlayer({
       setLineIndex(0);
       setCaptionPulseKey((current) => current + 1);
       setPlaying(true);
-      runCaptionSequence(item.durationSeconds * 1000);
-      await audio.play();
       setVoicePlaying(true);
+      await audio.play();
       setVoiceLoading(false);
     } catch (error) {
       console.error("Monkey short voice failed", error);
@@ -605,7 +655,7 @@ function MonkeyShortPlayer({
         setPlaying(true);
         setVoicePlaying(true);
         browserSpeechRef.current = speakBrowserText(fullText, {
-          rate: 1.02,
+          rate: 1.04,
           pitch: 0.98,
           onEnd: () => {
             setVoicePlaying(false);
@@ -664,13 +714,15 @@ function MonkeyShortPlayer({
           <div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 50% 18%, ${shortVisual.glow}22, transparent 40%)`,pointerEvents:"none"}} />
           <div style={{display:"flex",gap:7,alignSelf:"center",marginBottom:6}}>
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} style={{width:6,height:28 + (i % 3) * 10,borderRadius:99,background:i <= lineIndex ? shortVisual.glow : "rgba(255,255,255,0.12)",opacity:i <= lineIndex ? 1 : 0.5,transform:playing ? `scaleY(${1 + ((i + lineIndex) % 3) * 0.18})` : "scaleY(1)",transition:"all .35s ease"}} />
+              <div key={i} style={{width:6,height:28 + (i % 3) * 10,borderRadius:99,background:i <= lineIndex ? shortVisual.glow : "rgba(255,255,255,0.12)",opacity:i <= lineIndex ? 1 : 0.5,transform:playing ? `scaleY(${1 + ((i + lineIndex) % 3) * 0.18})` : `scaleY(${1 + (motionBeat % 2) * 0.03})`,transition:"all .35s ease"}} />
             ))}
           </div>
 
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8}}>
             <div className={playing || voicePlaying ? "anim-groundPulse" : undefined} style={{width:136,height:20,borderRadius:"50%",background:`radial-gradient(circle, ${shortVisual.glow}55 0%, rgba(255,255,255,0.08) 45%, transparent 72%)`,filter:"blur(5px)",opacity:0.88}} />
-            <img src={shortVisual.image} alt="" className={shortMotionClass} style={{width:168,height:168,objectFit:"contain",filter:`drop-shadow(0 0 28px ${shortVisual.glow}70)`}} />
+            <div className="anim-monkeyBob" style={{display:"flex",alignItems:"center",justifyContent:"center",transformOrigin:"50% 82%"}}>
+              <img src={shortVisual.image} alt="" className={shortMotionClass} style={{width:168,height:168,objectFit:"contain",filter:`drop-shadow(0 0 28px ${shortVisual.glow}70)`}} />
+            </div>
           </div>
 
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10,width:"100%"}}>
@@ -690,6 +742,10 @@ function MonkeyShortPlayer({
             )}
             <div style={{color:T.t2,fontSize:12,lineHeight:1.55,textAlign:"center",maxWidth:300}}>
               {item.hook}
+            </div>
+            <div style={{marginTop:4,padding:"10px 12px",borderRadius:14,background:"rgba(255,255,255,0.03)",border:`1px solid ${T.border}`,color:T.t2,fontSize:11,lineHeight:1.55,textAlign:"left",maxWidth:320,whiteSpace:"pre-wrap"}}>
+              <div style={{color:T.t3,fontSize:10,fontWeight:900,letterSpacing:0.5,marginBottom:6}}>CELÝ TEXT</div>
+              {fullText}
             </div>
           </div>
 
@@ -847,9 +903,7 @@ function ContentLibrary({
   const premiumItems = CONTENT_BLUEPRINT.filter((item) => PREMIUM_HERO_IDS.includes(item.id as typeof PREMIUM_HERO_IDS[number]));
   const [activeShortId, setActiveShortId] = useState<string | null>(null);
   const toggleShort = (item: ContentItem) => {
-    setActiveShortId((current) => current === item.id ? null : item.id);
-    audio.onended = () => { setPlaying(false); onComplete?.(); }; audio.onerror = () => setPlaying(false);
-    setPlaying(true); audio.play();
+    setActiveShortId((current) => (current === item.id ? null : item.id));
   };
 
   return (
