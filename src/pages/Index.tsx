@@ -578,25 +578,33 @@ function MonkeyShortPlayer({
   const captionDuration = Math.max(2, Math.round(sceneDurations[lineIndex] || item.durationSeconds / lines.length));
   const shortMotionClass = voicePlaying
     ? `${shortVisual.motionClass} anim-shortTalking`
-    : playing
+      : playing
       ? `${shortVisual.motionClass} anim-shortLive`
       : shortVisual.motionClass;
 
-  const playVoice = async () => {
-    if (voicePlaying && audioRef.current) {
-      audioRef.current.pause();
+  const stopShortPlayback = useCallback(() => {
+    clearCaptionTimers();
+    audioRef.current?.pause();
+    if (audioRef.current) {
       audioRef.current.currentTime = 0;
-      audioRef.current = null;
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
-      browserSpeechRef.current = null;
-      setVoicePlaying(false);
-      setVoiceLoading(false);
-      clearCaptionTimers();
-      setLineIndex(0);
-      setCaptionPulseKey((current) => current + 1);
-      setPlaying(false);
+    }
+    audioRef.current = null;
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    browserSpeechRef.current = null;
+    setVoiceLoading(false);
+    setVoicePlaying(false);
+    setPlaying(false);
+    setLineIndex(0);
+    setCaptionPulseKey((current) => current + 1);
+    setVoiceError(null);
+    setMotionBeat(0);
+  }, [clearCaptionTimers]);
+
+  const playVoice = async () => {
+    if (voicePlaying || playing) {
+      stopShortPlayback();
       return;
     }
 
@@ -629,14 +637,10 @@ function MonkeyShortPlayer({
         runCaptionSequence(durationMs);
       };
       audio.onended = () => {
-        setVoicePlaying(false);
-        setVoiceLoading(false);
-        setPlaying(false);
+        stopShortPlayback();
       };
       audio.onerror = () => {
-        setVoicePlaying(false);
-        setVoiceLoading(false);
-        setPlaying(false);
+        stopShortPlayback();
         setVoiceError("Prémiový hlas teď není dostupný.");
       };
       setLineIndex(0);
@@ -658,15 +662,11 @@ function MonkeyShortPlayer({
           rate: 1.04,
           pitch: 0.98,
           onEnd: () => {
-            setVoicePlaying(false);
-            setVoiceLoading(false);
-            setPlaying(false);
+            stopShortPlayback();
             browserSpeechRef.current = null;
           },
           onError: () => {
-            setVoicePlaying(false);
-            setVoiceLoading(false);
-            setPlaying(false);
+            stopShortPlayback();
             setVoiceError("Náhradní hlas se nepodařilo spustit. Zkus to prosím znovu.");
             browserSpeechRef.current = null;
           },
@@ -751,16 +751,15 @@ function MonkeyShortPlayer({
 
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,width:"100%",marginTop:10}}>
             <button onClick={() => {
-              setPlaying((prev) => {
-                const next = !prev;
-                if (!prev && lineIndex >= lines.length - 1) {
-                  setLineIndex(0);
-                  setCaptionPulseKey((current) => current + 1);
-                }
-                return next;
-              });
+              if (playing || voicePlaying) {
+                stopShortPlayback();
+                return;
+              }
+              setLineIndex(0);
+              setCaptionPulseKey((current) => current + 1);
+              setPlaying(true);
             }} style={{flex:1,padding:"11px 14px",background:"rgba(255,255,255,0.04)",border:`1px solid ${T.border}`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-              {playing ? "⏸ Pauza textu" : lineIndex > 0 ? "▶ Pokračovat v textu" : "▶ Spustit text"}
+              {playing || voicePlaying ? "■ Zastavit short" : lineIndex > 0 ? "▶ Pokračovat v textu" : "▶ Spustit text"}
             </button>
             <button onClick={playVoice} style={{flex:1,padding:"11px 14px",background:T.accentDim,border:`1px solid ${T.accent}30`,borderRadius:14,color:T.t1,fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
               {voiceLoading ? "⏳ Načítám hlas" : voicePlaying ? "■ Zastavit hlas" : "🔊 Přehrát prémiový hlas"}
