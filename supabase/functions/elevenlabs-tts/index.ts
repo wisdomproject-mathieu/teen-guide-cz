@@ -82,19 +82,13 @@ serve(async (req) => {
         upstreamMessage = "";
       }
       console.error("ElevenLabs error:", response.status, errText);
-      return new Response(JSON.stringify({
-        error: upstreamMessage.toLowerCase().includes("invalid api key") ? "Neplatný ELEVENLABS_API_KEY" : "TTS generation failed",
-        details: upstreamMessage || errText,
-      }), {
-        status: response.status,
-      // For auth/billing errors (401/402), signal client to use browser fallback
       const isRecoverable = response.status === 401 || response.status === 402 || response.status >= 500;
       return new Response(JSON.stringify({ 
         error: isRecoverable ? "SERVICE_UNAVAILABLE" : "TTS generation failed", 
         fallback: isRecoverable,
         details: errText 
       }), {
-        status: 200, // Return 200 so client can read the JSON body
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

@@ -69,7 +69,6 @@ export type Database = {
           display_name: string | null
           equipped_skin: string | null
           id: string
-          subscription_tier: string
           onboarded: boolean | null
           updated_at: string
         }
@@ -79,7 +78,6 @@ export type Database = {
           display_name?: string | null
           equipped_skin?: string | null
           id: string
-          subscription_tier?: string
           onboarded?: boolean | null
           updated_at?: string
         }
@@ -89,7 +87,6 @@ export type Database = {
           display_name?: string | null
           equipped_skin?: string | null
           id?: string
-          subscription_tier?: string
           onboarded?: boolean | null
           updated_at?: string
         }
