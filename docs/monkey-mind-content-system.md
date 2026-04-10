@@ -219,6 +219,30 @@ These are the best candidates for first premium-quality audio/video polish:
 - `Důkaz, že to umíš.`
 - `Autentický = neporazitelný.`
 
+## Current speech sources
+
+This is a simple map of the main voices currently referenced in the app. It is not the full 99-speech inventory, but it shows who the speeches are coming from and how they are used.
+
+| Speech | Who delivered it | Mood matching | Intensity |
+| --- | --- | --- | --- |
+| `Škola tě neporazí.` | Growth Mindset | positive / school | 1 |
+| `Flow state aktivován.` | Mihaly Csikszentmihalyi | positive / school | 2 |
+| `Autentický = neporazitelný.` | Brené Brown | positive / identity | 3 |
+| `Vztek na systém? Použij ho.` | David Goggins | anger / school | 3 |
+| `Zkrať horizont.` | David Goggins | anxiety / school | 2 |
+| `Tma je nejtemnější před svítáním.` | Les Brown | sadness / school, friends | 2 |
+| `Znáš sám sebe.` | Stoicismus / Marcus Aurelius | positive / identity | 1 |
+| `Jejich pravidla ≠ tvůj život.` | Stoicismus / Marcus Aurelius | anger / parents | 2 |
+| `Přeměň vztek v palivo.` | David Goggins | anger / siblings | 2 |
+| `Watch next: Denzel - Fall Forward` | Denzel Washington | sadness / anxiety / all | 2 |
+| `Monkey short: hit-back speech` | Monkey Mind original | anger / school, friends, parents | 3 |
+| `Monkey short: noční spirála stop` | Monkey Mind original | anxiety / sadness / social | 2 |
+
+Use this table as the quick read for:
+- who the app is borrowing inspiration from
+- which moods each voice belongs to
+- how hard the delivery should hit
+
 ## Pochop To content direction
 
 The old roadmap was right that educational content needs stronger structure, but the naming and linking should match the current app.
